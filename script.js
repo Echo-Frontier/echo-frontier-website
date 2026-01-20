@@ -1,44 +1,59 @@
 // script.js
 
-// Function to POST availability data to Netlify
-async function saveAvailability(data) {
-  try {
-    const res = await fetch('https://YOUR_NETLIFY_SITE.netlify.app/api/saveAvailability', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data)
+const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const slots = Array.from({length:48}, (_, i) => `${String(i/2|0).padStart(2,'0')}:${i%2===0?'00':'30'}-${String((i/2|0 + (i%2===0?0:1))%24).padStart(2,'0')}:${i%2===0?'30':'00'}`);
+
+const grid = Array.from({length:7}, ()=>Array(48).fill(0));
+
+const table = document.getElementById("availabilityGrid");
+
+// Build table
+days.forEach((day, d) => {
+  const tr = document.createElement("tr");
+  const th = document.createElement("th");
+  th.textContent = day;
+  tr.appendChild(th);
+
+  for(let s=0; s<48; s++){
+    const td = document.createElement("td");
+    td.classList.add("slot");
+    td.dataset.day = d;
+    td.dataset.slot = s;
+    td.addEventListener("click", ()=>{
+      grid[d][s] = grid[d][s] ? 0 : 1;
+      td.classList.toggle("active", grid[d][s]===1);
     });
-
-    const result = await res.json();
-    console.log(result);
-
-    // Show feedback to the user
-    const message = document.getElementById('statusMessage');
-    message.textContent = result.message || "Saved successfully!";
-    message.style.color = "green";
-
-  } catch (err) {
-    console.error("Failed to save availability:", err);
-    const message = document.getElementById('statusMessage');
-    message.textContent = "Error saving availability.";
-    message.style.color = "red";
+    tr.appendChild(td);
   }
-}
 
-// Attach event listener to your form
-document.addEventListener('DOMContentLoaded', () => {
-  const form = document.getElementById('availabilityForm');
-  if (!form) return;
+  table.appendChild(tr);
+});
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
+// Save button
+document.getElementById("saveButton").addEventListener("click", async ()=>{
+  const person = parseInt(document.getElementById("personSelect").value);
 
-    // Gather form data
-    const user = document.getElementById('userName').value;
-    const times = Array.from(document.querySelectorAll('input[name="times"]:checked'))
-                       .map(input => input.value);
+  try {
+    for(let day=0; day<7; day++){
+      await fetch('https://YOUR_NETLIFY_SITE.netlify.app/api/saveAvailability', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          person,
+          day,
+          grid: grid[day]
+        })
+      });
+    }
 
-    // Send data to Netlify
-    saveAvailability({ user, availability: times });
-  });
+    const msg = document.getElementById("statusMessage");
+    msg.textContent = "Availability saved!";
+    msg.style.color = "green";
+
+  } catch(err){
+    console.error(err);
+    const msg = document.getElementById("statusMessage");
+    msg.textContent = "Failed to save availability.";
+    msg.style.color = "red";
+  }
 });
