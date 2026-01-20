@@ -56,8 +56,7 @@ h2 { font-size:2rem; margin-bottom:16px; }
 }
 #editButton:hover { background:#5590e0; }
 
-/* --- SAME GRID STYLES AS edit.html --- */
-
+/* --- Grid Styles --- */
 .edit-wrapper {
   display:flex;
   flex-direction:column;
@@ -114,7 +113,7 @@ h2 { font-size:2rem; margin-bottom:16px; }
 
 <header>
   <div class="header-title">
-    <img src="icon.png">
+    <img src="icon.png" alt="Studio Icon">
     <h1>Echo Frontier</h1>
   </div>
 </header>
@@ -132,48 +131,34 @@ h2 { font-size:2rem; margin-bottom:16px; }
   </div>
 
   <div class="edit-wrapper">
-    <div class="days-header" id="daysHeader"></div>
+    <div class="days-header">
+      <div>Sun</div>
+      <div>Mon</div>
+      <div>Tue</div>
+      <div>Wed</div>
+      <div>Thu</div>
+      <div>Fri</div>
+      <div>Sat</div>
+    </div>
     <div class="time-grid-wrapper">
-      <div class="time-labels" id="timeLabels"></div>
-      <div class="availability-grid" id="availabilityGrid"></div>
+      <div class="time-labels">
+        <!-- Example static labels -->
+        <div>00:00</div><div>00:30</div>
+        <div>01:00</div><div>01:30</div>
+        <div>02:00</div><div>02:30</div>
+        <!-- Add more labels up to 23:30 -->
+      </div>
+      <div class="availability-grid">
+        <!-- Example grid cells: 7 days x 48 rows -->
+        <!-- You can copy/paste divs or leave empty placeholders -->
+        <div class="availability-cell"></div>
+        <div class="availability-cell"></div>
+        <div class="availability-cell"></div>
+        <!-- Repeat enough times to visually fill the grid -->
+      </div>
     </div>
   </div>
 </main>
-
-<script>
-async function loadAvailability() {
-  try {
-    const res = await fetch('https://YOUR_NETLIFY_SITE.netlify.app/.netlify/functions/saveAvailability');
-    const values = await res.json();
-
-    // Map sheet data to grid cells
-    // cells = 7 days × 48 slots = 336 cells per person
-    const personIndex = 0; // change 0-4 for Person 1–5
-
-    for (let row = 0; row < 48*7; row++) {
-      const day = row % 7;
-      const slotIndex = Math.floor(row / 7);
-
-      const cell = window.availabilityCells.find(c =>
-        parseInt(c.dataset.row) === slotIndex &&
-        parseInt(c.dataset.day) === day
-      );
-
-      if (!cell) continue;
-
-      const val = parseInt(values[row]?.[personIndex+1] || 0); // +1 to skip time column
-      if (val) cell.style.backgroundColor = "#6aa6ff";
-      else cell.style.backgroundColor = "#444454";
-    }
-  } catch (err) {
-    console.error("Failed to load availability:", err);
-  }
-}
-
-// Load on page load
-window.addEventListener('DOMContentLoaded', loadAvailability);
-</script>
-
 
 </body>
 </html>
