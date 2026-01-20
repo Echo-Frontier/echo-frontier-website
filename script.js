@@ -1,56 +1,55 @@
 // script.js
 
-const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const slots = Array.from({length:48}, (_, i) => `${String(i/2|0).padStart(2,'0')}:${i%2===0?'00':'30'}-${String((i/2|0 + (i%2===0?0:1))%24).padStart(2,'0')}:${i%2===0?'30':'00'}`);
+const hours = 24;
+const increments = 2;
+const days = 7;
+const personCount = 5;
 
-const grid = Array.from({length:7}, ()=>Array(48).fill(0));
+// cells from your availability.html grid
+const cells = window.availabilityCells;
 
-const table = document.getElementById("availabilityGrid");
+// Helper to get person selection (you can add a <select> in HTML)
+const personSelect = document.createElement("select");
+for (let i = 1; i <= personCount; i++) {
+  const opt = document.createElement("option");
+  opt.value = i;
+  opt.textContent = `Person ${i}`;
+  personSelect.appendChild(opt);
+}
+document.querySelector(".availability-header").appendChild(personSelect);
 
-// Build table
-days.forEach((day, d) => {
-  const tr = document.createElement("tr");
-  const th = document.createElement("th");
-  th.textContent = day;
-  tr.appendChild(th);
+// Build a 2D array for the grid: 7 days × 48 slots
+function getGridData() {
+  const grid = Array.from({ length: days }, () => Array(48).fill(0));
+  cells.forEach(cell => {
+    const row = parseInt(cell.dataset.row);
+    const day = parseInt(cell.dataset.day);
+    const isActive = cell.style.backgroundColor === "rgb(106, 166, 255)"; // #6aa6ff
+    grid[day][row] = isActive ? 1 : 0;
+  });
+  return grid;
+}
 
-  for(let s=0; s<48; s++){
-    const td = document.createElement("td");
-    td.classList.add("slot");
-    td.dataset.day = d;
-    td.dataset.slot = s;
-    td.addEventListener("click", ()=>{
-      grid[d][s] = grid[d][s] ? 0 : 1;
-      td.classList.toggle("active", grid[d][s]===1);
-    });
-    tr.appendChild(td);
-  }
-
-  table.appendChild(tr);
-});
-
-// Save button
-document.getElementById("saveButton").addEventListener("click", async ()=>{
-  const person = parseInt(document.getElementById("personSelect").value);
+// Save button handler
+document.getElementById("editButton").addEventListener("click", async () => {
+  const person = parseInt(personSelect.value);
+  const gridData = getGridData();
 
   try {
-    for(let day=0; day<7; day++){
-      await fetch('https://YOUR_NETLIFY_SITE.netlify.app/api/saveAvailability', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          person,
-          day,
-          grid: grid[day]
-        })
-      });
-    }
+    const res = await fetch('https://YOUR_NETLIFY_SITE.netlify.app/api/saveAvailability', {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        person,
+        grid: gridData // send entire 7x48 array at once
+      })
+    });
 
+    const result = await res.json();
     const msg = document.getElementById("statusMessage");
-    msg.textContent = "Availability saved!";
+    msg.textContent = result.message || "Availability saved!";
     msg.style.color = "green";
-
-  } catch(err){
+  } catch (err) {
     console.error(err);
     const msg = document.getElementById("statusMessage");
     msg.textContent = "Failed to save availability.";
