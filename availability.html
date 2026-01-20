@@ -3,76 +3,118 @@
 <head>
 <meta charset="UTF-8">
 <title>Availability</title>
-<link rel="stylesheet" href="styles.css">
+
 <style>
+* { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,sans-serif; }
+body { background:#0f0f14; color:#e6e6eb; }
+
+header { padding:32px 24px 20px; text-align:center; }
+.header-title { display:inline-flex; align-items:center; gap:14px; }
+.header-title img { height:2.4rem; }
+.header-title h1 { font-size:2.4rem; font-weight:600; letter-spacing:.05em; }
+
+nav {
+  position:sticky; top:0;
+  height:56px;
+  background:#151520;
+  display:flex;
+  justify-content:center;
+  align-items:center;
+  border-bottom:1px solid #2a2a3a;
+}
+nav a {
+  color:#cfcfe8;
+  text-decoration:none;
+  margin:0 28px;
+  font-weight:500;
+}
+nav a.active { color:#6aa6ff; }
+
 main {
-  max-width: 1200px;
-  margin: 40px auto;
-  padding: 0 24px;
+  max-width:1200px;
+  margin:40px auto;
+  padding:0 24px;
 }
 
-h2 {
-  font-size: 2rem;
-  margin-bottom: 24px;
+h2 { font-size:2rem; margin-bottom:16px; }
+
+.availability-header {
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  margin-bottom:16px;
 }
 
-/* Edit button */
 #editButton {
-  margin-bottom: 16px;
-  padding: 8px 16px;
-  font-size: 1rem;
-  background: #6aa6ff;
-  color: white;
-  border: none;
-  border-radius: 4px;
-  cursor: pointer;
+  padding:6px 16px;
+  font-size:1rem;
+  background:#6aa6ff;
+  color:white;
+  border:none;
+  border-radius:4px;
+  cursor:pointer;
+}
+#editButton:hover { background:#5590e0; }
+
+/* --- SAME GRID STYLES AS edit.html --- */
+
+.edit-wrapper {
+  display:flex;
+  flex-direction:column;
+  gap:4px;
+  overflow-x:auto;
 }
 
-#editButton:hover {
-  background: #5590e0;
+.days-header {
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:2px;
+}
+.days-header div {
+  text-align:center;
+  font-size:.9rem;
+  color:#b9b9cc;
 }
 
-/* Grid container */
-.availability-wrapper {
-  display: flex;
+.time-grid-wrapper {
+  display:grid;
+  grid-template-columns:auto 1fr;
+  gap:4px;
 }
 
-/* Time labels column */
 .time-labels {
-  display: flex;
-  flex-direction: column;
-  margin-right: 4px;
+  display:flex;
+  flex-direction:column;
 }
-
 .time-labels div {
-  height: 20px; /* row height */
-  font-size: 0.7rem;
-  color: #b9b9cc;
-  text-align: right;
-  padding-right: 4px;
-  line-height: 20px;
+  height:22px;
+  line-height:20px;
+  font-size:.7rem;
+  color:#b9b9cc;
+  text-align:right;
+  padding-right:4px;
 }
 
-/* Grid */
 .availability-grid {
-  display: grid;
-  grid-template-columns: repeat(7, 1fr); /* 7 days */
-  gap: 2px;
+  display:grid;
+  grid-template-columns:repeat(7,1fr);
+  gap:2px;
 }
 
 .availability-cell {
-  width: 100%;
-  height: 20px; /* match time label height */
-  background: #444454; /* base gray */
-  border-radius: 2px;
+  width:100%;
+  height:20px;
+  background:#444454;
+  border-radius:2px;
 }
 </style>
 </head>
+
 <body>
 
 <header>
   <div class="header-title">
-    <img src="icon.png" alt="Studio Icon">
+    <img src="icon.png">
     <h1>Echo Frontier</h1>
   </div>
 </header>
@@ -86,102 +128,93 @@ h2 {
 <main>
   <div class="availability-header">
     <h2>Members Availability</h2>
-    <button id="editButton" onclick="window.location='edit.html'">Edit</button>
+    <button id="editButton" onclick="location='edit.html'">Edit</button>
   </div>
 
-  <div class="availability-wrapper">
-    <div class="time-labels" id="timeLabels"></div>
-    <div id="availabilityGrid" class="availability-grid"></div>
+  <div class="edit-wrapper">
+    <div class="days-header" id="daysHeader"></div>
+    <div class="time-grid-wrapper">
+      <div class="time-labels" id="timeLabels"></div>
+      <div class="availability-grid" id="availabilityGrid"></div>
+    </div>
   </div>
 </main>
 
-
-<!-- Firebase SDK -->
 <script type="module">
 import { initializeApp } from "https://www.gstatic.com/firebasejs/10.15.0/firebase-app.js";
 import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.15.0/firebase-firestore.js";
 
-// Firebase config
 const firebaseConfig = {
   apiKey: "AIzaSyADRD-ZSdmtLAChpCJSg2m-eGD8KkZQLAw",
   authDomain: "echo-frontier.firebaseapp.com",
-  projectId: "echo-frontier",
-  storageBucket: "echo-frontier.firebasestorage.app",
-  messagingSenderId: "483328395754",
-  appId: "1:483328395754:web:8426b8abe728f6fd5e0a93"
+  projectId: "echo-frontier"
 };
 
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// --------------- CONFIG ------------------
-const hours = 24;
-const increments = 2; // half hour increments → 48 rows
-const days = 7;
+const hours = 24, increments = 2, days = 7;
+const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+
 const gridEl = document.getElementById("availabilityGrid");
 const labelsEl = document.getElementById("timeLabels");
+const daysHeaderEl = document.getElementById("daysHeader");
 
-// Build time labels
-for (let h = 0; h < hours; h++) {
-  for (let i = 0; i < increments; i++) {
-    const time = new Date();
-    time.setHours(h, i*30,0,0);
-    const label = document.createElement("div");
-    label.textContent = time.toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'});
-    labelsEl.appendChild(label);
+/* Days header */
+dayNames.forEach(d=>{
+  const div=document.createElement("div");
+  div.textContent=d;
+  daysHeaderEl.appendChild(div);
+});
+
+/* Time labels */
+for(let h=0;h<hours;h++){
+  for(let i=0;i<increments;i++){
+    const t=new Date();
+    t.setHours(h,i*30,0,0);
+    const div=document.createElement("div");
+    div.textContent=t.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    labelsEl.appendChild(div);
   }
 }
 
-// Build grid cells
-const cells = [];
-for (let row = 0; row < hours*increments; row++) {
-  for (let day = 0; day < days; day++) {
-    const cell = document.createElement("div");
-    cell.classList.add("availability-cell");
-    cell.dataset.day = day;
-    cell.dataset.row = row;
+/* Grid */
+const cells=[];
+for(let row=0;row<hours*increments;row++){
+  for(let day=0;day<days;day++){
+    const cell=document.createElement("div");
+    cell.className="availability-cell";
+    cell.dataset.row=row;
+    cell.dataset.day=day;
     gridEl.appendChild(cell);
     cells.push(cell);
   }
 }
 
-// --------------- Firestore ------------------
-const availCollection = collection(db, "availability");
+/* Firestore aggregation */
+onSnapshot(collection(db,"availability"), snap=>{
+  cells.forEach(c=>c.style.background="#444454");
 
-// Listen to all members
-onSnapshot(availCollection, (snap) => {
-  // Clear all cells
-  cells.forEach(cell => cell.style.background = "#444454");
+  const members = snap.docs.map(d=>Object.keys(d.data().slots||{}));
 
-  const memberData = [];
-  snap.docs.forEach(docSnap => {
-    const data = docSnap.data().slots || {};
-    memberData.push(data);
-  });
+  cells.forEach(cell=>{
+    const day=parseInt(cell.dataset.day);
+    const row=parseInt(cell.dataset.row);
 
-  // Count availability per cell
-  cells.forEach(cell => {
-    const day = parseInt(cell.dataset.day);
-    const row = parseInt(cell.dataset.row);
+    const hour=Math.floor(row/2);
+    const minute=(row%2)*30;
 
-    // Convert row/day to UTC key
-    const hour = Math.floor(row/2);
-    const minute = (row%2)*30;
-    const utcDate = new Date();
-    utcDate.setUTCDate(utcDate.getUTCDate() - utcDate.getUTCDay() + day);
-    utcDate.setUTCHours(hour, minute,0,0);
+    const utc=new Date();
+    utc.setUTCDate(utc.getUTCDate()-utc.getUTCDay()+day);
+    utc.setUTCHours(hour,minute,0,0);
 
-    let count = 0;
-    memberData.forEach(slots => {
-      const key = utcDate.toISOString();
-      if (slots[key]) count++;
-    });
+    let count=0;
+    members.forEach(m=>{ if(m.includes(utc.toISOString())) count++; });
 
-    // Gradient based on % of members available
-    const ratio = count / memberData.length;
-    if (ratio>0) {
-      const blue = Math.floor(100 + ratio*155);
-      cell.style.background = `rgb(0, 0, ${blue})`;
+    if(count>0){
+      const ratio=count/members.length;
+      const blue=Math.floor(100+ratio*155);
+      cell.style.background=`rgb(0,0,${blue})`;
     }
   });
 });
