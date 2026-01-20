@@ -140,19 +140,7 @@ h2 { font-size:2rem; margin-bottom:16px; }
   </div>
 </main>
 
-<script type="module">
-import { initializeApp } from "https://www.gstatic.com/firebasejs/10.15.0/firebase-app.js";
-import { getFirestore, collection, onSnapshot } from "https://www.gstatic.com/firebasejs/10.15.0/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyADRD-ZSdmtLAChpCJSg2m-eGD8KkZQLAw",
-  authDomain: "echo-frontier.firebaseapp.com",
-  projectId: "echo-frontier"
-};
-
-const app = initializeApp(firebaseConfig);
-const db = getFirestore(app);
-
+<script>
 const hours = 24, increments = 2, days = 7;
 const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
 
@@ -160,64 +148,43 @@ const gridEl = document.getElementById("availabilityGrid");
 const labelsEl = document.getElementById("timeLabels");
 const daysHeaderEl = document.getElementById("daysHeader");
 
+const cells = [];
+
 /* Days header */
-dayNames.forEach(d=>{
-  const div=document.createElement("div");
-  div.textContent=d;
+dayNames.forEach(d => {
+  const div = document.createElement("div");
+  div.textContent = d;
   daysHeaderEl.appendChild(div);
 });
 
 /* Time labels */
-for(let h=0;h<hours;h++){
-  for(let i=0;i<increments;i++){
-    const t=new Date();
-    t.setHours(h,i*30,0,0);
-    const div=document.createElement("div");
-    div.textContent=t.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+for (let h = 0; h < hours; h++) {
+  for (let i = 0; i < increments; i++) {
+    const t = new Date();
+    t.setHours(h, i * 30, 0, 0);
+    const div = document.createElement("div");
+    div.textContent = t.toLocaleTimeString([], {
+      hour: "2-digit",
+      minute: "2-digit"
+    });
     labelsEl.appendChild(div);
   }
 }
 
 /* Grid */
-const cells=[];
-for(let row=0;row<hours*increments;row++){
-  for(let day=0;day<days;day++){
-    const cell=document.createElement("div");
-    cell.className="availability-cell";
-    cell.dataset.row=row;
-    cell.dataset.day=day;
+for (let row = 0; row < hours * increments; row++) {
+  for (let day = 0; day < days; day++) {
+    const cell = document.createElement("div");
+    cell.className = "availability-cell";
+    cell.dataset.row = row;
+    cell.dataset.day = day;
     gridEl.appendChild(cell);
     cells.push(cell);
   }
 }
 
-/* Firestore aggregation */
-onSnapshot(collection(db,"availability"), snap=>{
-  cells.forEach(c=>c.style.background="#444454");
-
-  const members = snap.docs.map(d=>Object.keys(d.data().slots||{}));
-
-  cells.forEach(cell=>{
-    const day=parseInt(cell.dataset.day);
-    const row=parseInt(cell.dataset.row);
-
-    const hour=Math.floor(row/2);
-    const minute=(row%2)*30;
-
-    const utc=new Date();
-    utc.setUTCDate(utc.getUTCDate()-utc.getUTCDay()+day);
-    utc.setUTCHours(hour,minute,0,0);
-
-    let count=0;
-    members.forEach(m=>{ if(m.includes(utc.toISOString())) count++; });
-
-    if(count>0){
-      const ratio=count/members.length;
-      const blue=Math.floor(100+ratio*155);
-      cell.style.background=`rgb(0,0,${blue})`;
-    }
-  });
-});
+/* expose cells for module script */
+window.availabilityCells = cells;
 </script>
 
 </body>
