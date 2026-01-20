@@ -141,51 +141,39 @@ h2 { font-size:2rem; margin-bottom:16px; }
 </main>
 
 <script>
-const hours = 24, increments = 2, days = 7;
-const dayNames = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+async function loadAvailability() {
+  try {
+    const res = await fetch('https://YOUR_NETLIFY_SITE.netlify.app/.netlify/functions/saveAvailability');
+    const values = await res.json();
 
-const gridEl = document.getElementById("availabilityGrid");
-const labelsEl = document.getElementById("timeLabels");
-const daysHeaderEl = document.getElementById("daysHeader");
+    // Map sheet data to grid cells
+    // cells = 7 days × 48 slots = 336 cells per person
+    const personIndex = 0; // change 0-4 for Person 1–5
 
-const cells = [];
+    for (let row = 0; row < 48*7; row++) {
+      const day = row % 7;
+      const slotIndex = Math.floor(row / 7);
 
-/* Days header */
-dayNames.forEach(d => {
-  const div = document.createElement("div");
-  div.textContent = d;
-  daysHeaderEl.appendChild(div);
-});
+      const cell = window.availabilityCells.find(c =>
+        parseInt(c.dataset.row) === slotIndex &&
+        parseInt(c.dataset.day) === day
+      );
 
-/* Time labels */
-for (let h = 0; h < hours; h++) {
-  for (let i = 0; i < increments; i++) {
-    const t = new Date();
-    t.setHours(h, i * 30, 0, 0);
-    const div = document.createElement("div");
-    div.textContent = t.toLocaleTimeString([], {
-      hour: "2-digit",
-      minute: "2-digit"
-    });
-    labelsEl.appendChild(div);
+      if (!cell) continue;
+
+      const val = parseInt(values[row]?.[personIndex+1] || 0); // +1 to skip time column
+      if (val) cell.style.backgroundColor = "#6aa6ff";
+      else cell.style.backgroundColor = "#444454";
+    }
+  } catch (err) {
+    console.error("Failed to load availability:", err);
   }
 }
 
-/* Grid */
-for (let row = 0; row < hours * increments; row++) {
-  for (let day = 0; day < days; day++) {
-    const cell = document.createElement("div");
-    cell.className = "availability-cell";
-    cell.dataset.row = row;
-    cell.dataset.day = day;
-    gridEl.appendChild(cell);
-    cells.push(cell);
-  }
-}
-
-/* expose cells for module script */
-window.availabilityCells = cells;
+// Load on page load
+window.addEventListener('DOMContentLoaded', loadAvailability);
 </script>
+
 
 </body>
 </html>
