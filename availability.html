@@ -3,112 +3,37 @@
 <head>
 <meta charset="UTF-8">
 <title>Availability</title>
-
 <style>
-* { box-sizing:border-box; margin:0; padding:0; font-family:system-ui,sans-serif; }
-body { background:#0f0f14; color:#e6e6eb; }
+* { box-sizing:border-box; margin:0; padding:0; font-family: system-ui,sans-serif; }
+body { background: #0f0f14; color:#e6e6eb; }
 
 header { padding:32px 24px 20px; text-align:center; }
 .header-title { display:inline-flex; align-items:center; gap:14px; }
-.header-title img { height:2.4rem; }
-.header-title h1 { font-size:2.4rem; font-weight:600; letter-spacing:.05em; }
+.header-title img { height:2.4rem; width:auto; }
+.header-title h1 { font-size:2.4rem; font-weight:600; letter-spacing:0.05em; }
 
-nav {
-  position:sticky; top:0;
-  height:56px;
-  background:#151520;
-  display:flex;
-  justify-content:center;
-  align-items:center;
-  border-bottom:1px solid #2a2a3a;
-}
-nav a {
-  color:#cfcfe8;
-  text-decoration:none;
-  margin:0 28px;
-  font-weight:500;
-}
+nav { position:sticky; top:0; height:56px; background:#151520; display:flex; justify-content:center; align-items:center; border-bottom:1px solid #2a2a3a; }
+nav a { color:#cfcfe8; text-decoration:none; margin:0 28px; font-weight:500; }
 nav a.active { color:#6aa6ff; }
 
-main {
-  max-width:1200px;
-  margin:40px auto;
-  padding:0 24px;
-}
+main { max-width:1200px; margin:40px auto; padding:0 24px; }
 
 h2 { font-size:2rem; margin-bottom:16px; }
+.availability-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 
-.availability-header {
-  display:flex;
-  justify-content:space-between;
-  align-items:center;
-  margin-bottom:16px;
-}
+.edit-wrapper { display:flex; flex-direction:column; gap:4px; overflow-x:auto; }
 
-#editButton {
-  padding:6px 16px;
-  font-size:1rem;
-  background:#6aa6ff;
-  color:white;
-  border:none;
-  border-radius:4px;
-  cursor:pointer;
-}
-#editButton:hover { background:#5590e0; }
+.days-header { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:4px; }
+.days-header div { text-align:center; color:#b9b9cc; font-size:0.9rem; }
 
-/* --- Grid Styles --- */
-.edit-wrapper {
-  display:flex;
-  flex-direction:column;
-  gap:4px;
-  overflow-x:auto;
-}
+.time-grid-wrapper { display:grid; grid-template-columns:auto 1fr; gap:4px; align-items:start; overflow-x:auto; }
+.time-labels { display:flex; flex-direction:column; flex-shrink:0; }
+.time-labels div { height:22px; line-height:20px; font-size:0.7rem; color:#b9b9cc; text-align:right; padding-right:4px; }
 
-.days-header {
-  display:grid;
-  grid-template-columns:repeat(7,1fr);
-  gap:2px;
-}
-.days-header div {
-  text-align:center;
-  font-size:.9rem;
-  color:#b9b9cc;
-}
-
-.time-grid-wrapper {
-  display:grid;
-  grid-template-columns:auto 1fr;
-  gap:4px;
-}
-
-.time-labels {
-  display:flex;
-  flex-direction:column;
-}
-.time-labels div {
-  height:22px;
-  line-height:20px;
-  font-size:.7rem;
-  color:#b9b9cc;
-  text-align:right;
-  padding-right:4px;
-}
-
-.availability-grid {
-  display:grid;
-  grid-template-columns:repeat(7,1fr);
-  gap:2px;
-}
-
-.availability-cell {
-  width:100%;
-  height:20px;
-  background:#444454;
-  border-radius:2px;
-}
+.availability-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
+.availability-cell { width:100%; height:20px; background:#444454; border-radius:2px; }
 </style>
 </head>
-
 <body>
 
 <header>
@@ -127,38 +52,56 @@ h2 { font-size:2rem; margin-bottom:16px; }
 <main>
   <div class="availability-header">
     <h2>Members Availability</h2>
-    <button id="editButton" onclick="location='edit.html'">Edit</button>
+    <button onclick="location='edit.html'">Edit</button>
   </div>
 
   <div class="edit-wrapper">
-    <div class="days-header">
-      <div>Sun</div>
-      <div>Mon</div>
-      <div>Tue</div>
-      <div>Wed</div>
-      <div>Thu</div>
-      <div>Fri</div>
-      <div>Sat</div>
-    </div>
+    <div class="days-header" id="daysHeader"></div>
     <div class="time-grid-wrapper">
-      <div class="time-labels">
-        <!-- Example static labels -->
-        <div>00:00</div><div>00:30</div>
-        <div>01:00</div><div>01:30</div>
-        <div>02:00</div><div>02:30</div>
-        <!-- Add more labels up to 23:30 -->
-      </div>
-      <div class="availability-grid">
-        <!-- Example grid cells: 7 days x 48 rows -->
-        <!-- You can copy/paste divs or leave empty placeholders -->
-        <div class="availability-cell"></div>
-        <div class="availability-cell"></div>
-        <div class="availability-cell"></div>
-        <!-- Repeat enough times to visually fill the grid -->
-      </div>
+      <div class="time-labels" id="timeLabels"></div>
+      <div class="availability-grid" id="availabilityGrid"></div>
     </div>
   </div>
 </main>
+
+<script>
+// Settings
+const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+const hours = 24;
+const increments = 2;
+
+// Elements
+const daysHeaderEl = document.getElementById("daysHeader");
+const labelsEl = document.getElementById("timeLabels");
+const gridEl = document.getElementById("availabilityGrid");
+
+// Populate day headers
+days.forEach(d => {
+  const div = document.createElement("div");
+  div.textContent = d;
+  daysHeaderEl.appendChild(div);
+});
+
+// Populate time labels (half-hour increments)
+for(let h=0;h<hours;h++){
+  for(let i=0;i<increments;i++){
+    const div = document.createElement("div");
+    const date = new Date();
+    date.setHours(h,i*30,0,0);
+    div.textContent = date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
+    labelsEl.appendChild(div);
+  }
+}
+
+// Generate 7x48 grid cells
+for(let row=0;row<hours*increments;row++){
+  for(let day=0;day<days.length;day++){
+    const cell = document.createElement("div");
+    cell.className="availability-cell";
+    gridEl.appendChild(cell);
+  }
+}
+</script>
 
 </body>
 </html>
