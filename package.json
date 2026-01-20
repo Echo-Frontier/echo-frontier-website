@@ -1,1 +1,17 @@
+{
+  "name": "echo-frontier-website",
+  "version": "1.0.0",
+  "description": "Echo Frontier official website",
+  "main": "index.html",
+  "scripts": {
+    "start": "live-server",
+    "build": "echo \"No build step needed\""
+  },
+  "keywords": ["echo", "frontier", "website"],
+  "author": "Corbin Tinnin",
+  "license": "MIT",
+  "devDependencies": {
+    "live-server": "^1.2.2"
+  }
+}
 
