@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Home</title>
+  <title>Members - Echo Frontier</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
@@ -23,38 +23,35 @@
 <main>
   <h2>Members</h2>
 
-  <div class="members-grid">
-    <div class="member-card">
-      <img src="mem1.png" alt="Member 1">
-      <div class="member-name">Speedix08</div>
-      <div class="member-title">Lead Artist</div>
-    </div>
-
-    <div class="member-card">
-      <img src="mem2.png" alt="Member 2">
-      <div class="member-name">GD_Abomination</div>
-      <div class="member-title">Lead Developer</div>
-    </div>
-
-    <div class="member-card">
-      <img src="mem3.png" alt="Member 3">
-      <div class="member-name">SimLeek</div>
-      <div class="member-title">Lead Programmer</div>
-    </div>
-
-    <div class="member-card">
-      <img src="mem4.png" alt="Member 4">
-      <div class="member-name">Flame</div>
-      <div class="member-title">Team Manager</div>
-    </div>
-
-    <div class="member-card">
-      <img src="mem5.png" alt="Member 5">
-      <div class="member-name">Lele</div>
-      <div class="member-title">Lore Master</div>
-    </div>
+  <div class="members-grid" id="members-grid">
+    <!-- Member cards will be injected here -->
   </div>
 </main>
+
+<script>
+  fetch('data/team.json')
+    .then(response => response.json())
+    .then(team => {
+      const container = document.getElementById('members-grid');
+      container.innerHTML = '';
+
+      team.forEach(member => {
+        const card = document.createElement('div');
+        card.classList.add('member-card');
+
+        card.innerHTML = `
+          <img src="${member.avatar}" alt="${member.name}">
+          <div class="member-name">${member.name}</div>
+          <div class="member-title">${member.title}</div>
+        `;
+
+        container.appendChild(card);
+      });
+    })
+    .catch(err => {
+      console.error('Failed to load team data:', err);
+    });
+</script>
 
 </body>
 </html>
