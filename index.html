@@ -23,6 +23,28 @@
 
 
 <main>
+  <style>
+    /* Projects grid layout */
+    #projects-container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 16px;
+    }
+
+    /* Each project card */
+    #projects-container > * {
+      transition: transform 0.2s ease, box-shadow 0.2s ease;
+      will-change: transform;
+    }
+
+    /* Hover effect without changing layout */
+    #projects-container > *:hover {
+      transform: scale(1.05); /* grows visually but does not affect grid size */
+      box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+      z-index: 1; /* keeps hover above neighbors */
+    }
+  </style>
+
   <div id="projects-container" class="projects-grid">
     <!-- Projects will be injected here -->
   </div>
