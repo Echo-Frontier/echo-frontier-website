@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Contact - Echo Frontier</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+
+  <!-- Force reload of stylesheet if cached; you can remove ?v=2 later. -->
+  <link rel="stylesheet" href="styles.css?v=2">
+
+  <!-- CRITICAL INLINE STYLES (ensures the contact card looks correct even if external CSS is cached/overridden) -->
+  <style>
+    /* Critical contact-card styles - placed inline to guarantee they apply first */
+    :root {
+      --bg-card: #151520;
+      --bg-card-2: #18181c;
+      --border: #2a2a3a;
+      --accent: #6aa6ff;
+      --text: #e6e6eb;
+      --muted: #b9b9cc;
+      --btn-text: #061025;
+    }
+
+    body { background:#0f0f14; color:var(--text); font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale; }
+
+    main { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
+    h2 { font-size: 2rem; margin-bottom: 16px; text-align: center; color: var(--text); }
+
+    /* Ensure nav looks correct (minimal) */
+    nav a.active { color: var(--accent); background: rgba(106,166,255,0.06); }
+
+    /* HIGH-SPECIFICITY contact card to override UA/default styles */
+    main .contact-card, main .contact-card * { box-sizing: border-box; -webkit-font-smoothing:antialiased; }
+
+    main .contact-card {
+      background: linear-gradient(180deg, #141418 0%, #16161a 100%) !important;
+      padding: 26px !important;
+      border-radius: 10px !important;
+      max-width: 520px !important;
+      margin: 12px auto 48px auto !important;
+      box-shadow: 0 8px 30px rgba(2,4,9,0.6), inset 0 1px 0 rgba(255,255,255,0.02) !important;
+      border: 1px solid rgba(255,255,255,0.03) !important;
+      color: var(--text) !important;
+    }
+
+    /* Kill browser default input styling, then reapply exactly what we want */
+    main .contact-card form.contact-form input,
+    main .contact-card form.contact-form textarea,
+    main .contact-card form.contact-form select {
+      all: unset;
+      display: block;
+      width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+      padding: 12px 14px;
+      border-radius: 8px;
+      background: var(--bg-card) !important;
+      color: var(--text) !important;
+      border: 1px solid var(--border) !important;
+      font-size: 1rem;
+      line-height: 1.2;
+      box-shadow: none;
+      -webkit-appearance: none;
+      -moz-appearance: none;
+      appearance: none;
+    }
+    main .contact-card form.contact-form input[type="text"],
+    main .contact-card form.contact-form input[type="email"] {
+      width: 90% !important;
+      margin-left: auto;
+      margin-right: auto;
+    }
+
+
+    /* Ensure placeholder color */
+    main .contact-card form.contact-form input::placeholder,
+    main .contact-card form.contact-form textarea::placeholder,
+    main .contact-card form.contact-form select::placeholder {
+      color: #9ea6bf !important;
+      opacity: 1;
+    }
+
+    /* Focus state */
+    main .contact-card form.contact-form input:focus,
+    main .contact-card form.contact-form textarea:focus,
+    main .contact-card form.contact-form select:focus {
+      outline: none !important;
+      border-color: var(--accent) !important;
+      box-shadow: 0 0 0 6px rgba(106,166,255,0.04) !important;
+      background: var(--bg-card-2) !important;
+    }
+
+    /* Disable the textarea from resizing horizontally/affecting other boxes */
+    main .contact-card form.contact-form textarea {
+      min-height: 140px;
+      resize: none !important; /* prevents layout shifts */
+      overflow: auto;
+    }
+
+    /* Submit button: neutralize UA, then style */
+    main .contact-card form.contact-form button[type="submit"] {
+      all: unset;
+      display: inline-block;
+      width: 90%;
+      margin-left: auto;
+      margin-right: auto;
+      text-align: center;
+      padding: 12px 16px;
+      border-radius: 8px;
+      background: linear-gradient(180deg, var(--accent) 0%, #5a95e6 100%) !important;
+      color: var(--btn-text) !important;
+      font-weight: 600;
+      cursor: pointer;
+      box-shadow: 0 6px 18px rgba(51,98,170,0.12);
+      transition: transform .08s ease, filter .12s ease;
+    }
+    main .contact-card form.contact-form button[type="submit"]:hover {
+      filter: brightness(.98);
+      transform: translateY(-1px);
+    }
+    main .contact-card form.contact-form button[type="submit"]:active {
+      transform: translateY(0);
+    }
+
+    /* small helper text */
+    main .contact-card .form-note { font-size: 0.9rem; color: var(--muted); margin-top: 6px; }
+
+    /* mobile */
+    @media (max-width:640px){
+      main { margin: 24px auto; padding: 0 16px; }
+      main .contact-card { padding: 18px; max-width: 92%; margin-bottom: 32px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <img src="icon.png" alt="Studio Icon">
+    <h1>Echo Frontier</h1>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Home</a>
+  <a href="members.html">Members</a>
+  <a href="availability.html">Availability</a>
+  <a href="contact.html" class="active">Contact</a>
+</nav>
+
+<main>
+  <h2>Contact Us</h2>
+
+  <div class="contact-card" role="region" aria-labelledby="contact-heading">
+    <div class="card-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+      <div class="label" id="contact-heading" style="color:#b9b9cc;font-size:0.95rem;">Send us a message</div>
+      <div class="hint" style="color:#8f98b3;font-size:0.85rem;">We typically reply in a few business days</div>
+    </div>
+
+    <!-- Replace the action URL with your Formspree endpoint -->
+    <form class="contact-form" action="https://formspree.io/f/xxxxx" method="POST" novalidate>
+      <input type="text" name="name" placeholder="Your name" aria-label="Name" required>
+      <input type="email" name="email" placeholder="Your email" aria-label="Email" required>
+
+      <select name="reason" aria-label="Reason" required>
+        <option value="" disabled selected>Reason for contacting</option>
+        <option value="general">General question</option>
+        <option value="collab">Collaboration</option>
+        <option value="press">Press / Media</option>
+        <option value="other">Other</option>
+      </select>
+
+      <textarea name="message" placeholder="Your message" aria-label="Message" required></textarea>
+
+      <div class="form-note" id="form-note" aria-live="polite" style="display:none;"></div>
+
+      <button type="submit">Send</button>
+    </form>
+  </div>
+</main>
+
+<script>
+  // show friendly note if ?success=1 is present
+  (function(){
+    const url = new URL(window.location.href);
+    const noteEl = document.getElementById('form-note');
+    if (url.searchParams.get('success') === '1') {
+      noteEl.textContent = 'Thanks — your message was sent.';
+      noteEl.style.display = 'block';
+    }
+  })();
+</script>
+
+</body>
+</html>

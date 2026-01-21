@@ -1,37 +1,57 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<title>Availability</title>
+<meta charset="utf-8" />
+<title>Availability - Echo Frontier</title>
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<link rel="stylesheet" href="styles.css">
 <style>
-* { box-sizing:border-box; margin:0; padding:0; font-family: system-ui,sans-serif; }
-body { background: #0f0f14; color:#e6e6eb; }
-
+/* Minimal inline styles to guarantee layout & visuals */
+body { background:#0f0f14; color:#e6e6eb; font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
 header { padding:32px 24px 20px; text-align:center; }
 .header-title { display:inline-flex; align-items:center; gap:14px; }
 .header-title img { height:2.4rem; width:auto; }
 .header-title h1 { font-size:2.4rem; font-weight:600; letter-spacing:0.05em; }
 
-nav { position:sticky; top:0; height:56px; background:#151520; display:flex; justify-content:center; align-items:center; border-bottom:1px solid #2a2a3a; }
+nav { position:sticky; top:0; height:56px; background:#151520; display:flex; justify-content:center; align-items:center; border-bottom:1px solid #2a2a3a; z-index:100; }
 nav a { color:#cfcfe8; text-decoration:none; margin:0 28px; font-weight:500; }
 nav a.active { color:#6aa6ff; }
 
-main { max-width:1200px; margin:40px auto; padding:0 24px; }
-
+main { max-width:1200px; margin:40px auto; padding:0 24px; position:relative; }
 h2 { font-size:2rem; margin-bottom:16px; }
-.availability-header { display:flex; justify-content:space-between; align-items:center; margin-bottom:16px; }
 
-.edit-wrapper { display:flex; flex-direction:column; gap:4px; overflow-x:auto; }
+/* Buttons */
+.edit-button { all: unset; display:inline-block; padding:8px 16px; border-radius:6px; background:#6aa6ff; color:#061025; font-weight:600; cursor:pointer; }
+.edit-button:hover { filter:brightness(.95); }
+.ctrl-btn { all: unset; display:inline-block; padding:8px 12px; border-radius:6px; background:#6aa6ff; color:#061025; font-weight:600; cursor:pointer; margin-left:8px; }
+.ctrl-btn.secondary { background:#d8d8d8; color:#061025; }
 
-.days-header { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-bottom:4px; }
+/* Grid layout */
+.grid-wrapper { display:grid; grid-template-columns:60px 1fr; gap:4px; overflow-x:auto; }
+.days-header { display:grid; grid-template-columns:repeat(7,1fr); margin-bottom:4px; }
 .days-header div { text-align:center; color:#b9b9cc; font-size:0.9rem; }
-
-.time-grid-wrapper { display:grid; grid-template-columns:auto 1fr; gap:4px; align-items:start; overflow-x:auto; }
-.time-labels { display:flex; flex-direction:column; flex-shrink:0; }
+.time-labels { display:flex; flex-direction:column; flex-shrink:0; margin-top:24px; }
 .time-labels div { height:22px; line-height:20px; font-size:0.7rem; color:#b9b9cc; text-align:right; padding-right:4px; }
 
-.availability-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; }
-.availability-cell { width:100%; height:20px; background:#444454; border-radius:2px; }
+.availability-grid { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; width:100%; }
+.availability-cell { width:100%; height:20px; background:#444454; border-radius:2px; transition:background 0.12s; }
+
+/* Editable marker and active color */
+.availability-cell.editable { cursor:pointer; }
+.availability-cell.active { background:#6aa6ff !important; }
+
+/* Login overlay */
+#loginOverlay { position: fixed; inset:0; display:none; justify-content:center; align-items:center; z-index:999; background: rgba(0,0,0,0.86); }
+.login-card { background:#151520; padding:28px; border-radius:10px; max-width:420px; width:92%; box-shadow: 0 10px 30px rgba(0,0,0,0.7); }
+.login-card h2 { text-align:center; margin-bottom:18px; color:#e6e6eb; }
+.login-card input { all: unset; display:block; width:90%; padding:10px 12px; border-radius:8px; background:#18181c; color:#e6e6eb; border:1px solid #2a2a3a; margin-bottom:12px; }
+.login-card input::placeholder { color:#9ea6bf; }
+.login-card input:focus { outline:none; border-color:#6aa6ff; box-shadow:0 0 0 6px rgba(106,166,255,0.04); background:#1a1a1f; }
+.login-card button { all: unset; display:block; width:90%; text-align:center; padding:12px; border-radius:8px; background: linear-gradient(180deg,#6aa6ff,#5a95e6); color:#061025; font-weight:600; cursor:pointer; }
+.login-note { color:#b9b9cc; font-size:0.9rem; text-align:center; margin-top:10px; }
+
+.edit-controls { display:flex; justify-content:flex-end; gap:8px; margin-bottom:12px; }
+.edit-controls select { all: unset; display:inline-block; padding:8px 10px; border-radius:6px; background:#18181c; color:#e6e6eb; border:1px solid #2a2a3a; }
 </style>
 </head>
 <body>
@@ -47,61 +67,247 @@ h2 { font-size:2rem; margin-bottom:16px; }
   <a href="index.html">Home</a>
   <a href="members.html">Members</a>
   <a href="availability.html" class="active">Availability</a>
+  <a href="contact.html">Contact</a>
 </nav>
 
 <main>
-  <div class="availability-header">
+  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
     <h2>Members Availability</h2>
-    <button onclick="location='edit.html'">Edit</button>
+    <button id="editBtn" class="edit-button">Edit</button>
   </div>
 
-  <div class="edit-wrapper">
-    <div class="days-header" id="daysHeader"></div>
-    <div class="time-grid-wrapper">
-      <div class="time-labels" id="timeLabels"></div>
-      <div class="availability-grid" id="availabilityGrid"></div>
+  <!-- Edit controls (shown during edit) -->
+  <div class="edit-controls" id="editControls" style="display:none;">
+    <select id="memberSelect">
+      <option value="">Select member</option>
+      <option value="Speedix08">Speedix08</option>
+      <option value="GD_Abomination">GD_Abomination</option>
+      <option value="SimLeek">SimLeek</option>
+      <option value="Flame">Flame</option>
+      <option value="Lele">Lele</option>
+    </select>
+    <button id="saveBtn" class="ctrl-btn">Save</button>
+    <button id="cancelBtn" class="ctrl-btn secondary">Cancel</button>
+  </div>
+
+  <div class="grid-wrapper">
+    <div class="time-labels" id="timeLabels"></div>
+
+    <div>
+      <div class="days-header" id="daysHeader"></div>
+      <div class="availability-grid" id="availabilityGrid" aria-live="polite"></div>
     </div>
   </div>
 </main>
 
+<!-- Login overlay -->
+<div id="loginOverlay" role="dialog" aria-modal="true">
+  <div class="login-card" role="document" aria-labelledby="loginTitle">
+    <h2 id="loginTitle">Member Login</h2>
+    <input id="loginUser" type="text" placeholder="Username" autocomplete="username" />
+    <input id="loginPass" type="password" placeholder="Password" autocomplete="current-password" />
+    <button id="loginSubmit">Login</button>
+    <div class="login-note">Login persists locally so you stay signed in across pages.</div>
+  </div>
+</div>
+
 <script>
-// Settings
+/* ================= CONFIG ================= */
 const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
-const hours = 24;
-const increments = 2;
+const HOURS = 24;
+const INCREMENTS = 2; // half-hour
+const ROWS = HOURS * INCREMENTS;
 
-// Elements
-const daysHeaderEl = document.getElementById("daysHeader");
-const labelsEl = document.getElementById("timeLabels");
-const gridEl = document.getElementById("availabilityGrid");
+const LOGIN_USER = 'EchoFrontier';
+const LOGIN_PASS = '3ch0Fr0ntier';
 
-// Populate day headers
-days.forEach(d => {
-  const div = document.createElement("div");
-  div.textContent = d;
-  daysHeaderEl.appendChild(div);
+/* ================= ELEMENTS ================= */
+const daysHeaderEl = document.getElementById('daysHeader');
+const labelsEl = document.getElementById('timeLabels');
+const gridEl = document.getElementById('availabilityGrid');
+
+const editBtn = document.getElementById('editBtn');
+const editControls = document.getElementById('editControls');
+const memberSelect = document.getElementById('memberSelect');
+const saveBtn = document.getElementById('saveBtn');
+const cancelBtn = document.getElementById('cancelBtn');
+
+const loginOverlay = document.getElementById('loginOverlay');
+const loginUser = document.getElementById('loginUser');
+const loginPass = document.getElementById('loginPass');
+const loginSubmit = document.getElementById('loginSubmit');
+
+/* ================= STATE ================= */
+let isEditing = false;
+let isDragging = false;
+let dragState = null; // true = set active, false = unset
+
+/* ================= BUILD GRID ================= */
+function buildGrid() {
+  // headers
+  days.forEach(d => {
+    const div = document.createElement('div');
+    div.textContent = d;
+    daysHeaderEl.appendChild(div);
+  });
+
+  // time labels
+  for (let h = 0; h < HOURS; h++) {
+    for (let i = 0; i < INCREMENTS; i++) {
+      const div = document.createElement('div');
+      const date = new Date();
+      date.setHours(h, i * 30, 0, 0);
+      div.textContent = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      labelsEl.appendChild(div);
+    }
+  }
+
+  // cells
+  for (let r = 0; r < ROWS; r++){
+    for (let d = 0; d < 7; d++){
+      const cell = document.createElement('div');
+      cell.className = 'availability-cell';
+      cell.dataset.index = (r * 7 + d).toString();
+
+      cell.addEventListener('mousedown', e => {
+        if (!isEditing || e.button !== 0) return;
+        e.preventDefault();
+        isDragging = true;
+        dragState = !cell.classList.contains('active');
+        applyCellActive(cell, dragState);
+      });
+
+      cell.addEventListener('mouseenter', () => {
+        if (!isEditing || !isDragging) return;
+        applyCellActive(cell, dragState);
+      });
+
+      gridEl.appendChild(cell);
+    }
+  }
+
+  document.addEventListener('mouseup', () => { isDragging = false; dragState = null; });
+}
+buildGrid();
+
+/* ================= HELPERS ================= */
+function applyCellActive(cell, shouldBeActive){
+  if(shouldBeActive) cell.classList.add('active');
+  else cell.classList.remove('active');
+  cell.style.background = '';
+}
+function clearAllCells(){
+  [...gridEl.children].forEach(c => { c.classList.remove('active'); c.style.background=''; });
+}
+
+/* ================= LOGIN ================= */
+function isLoggedIn(){ return localStorage.getItem('ef-auth')==='true'; }
+
+editBtn.addEventListener('click', () => {
+  if(isLoggedIn()){ enterEditMode(); return; }
+  loginOverlay.style.display='flex'; loginUser.focus();
 });
 
-// Populate time labels (half-hour increments)
-for(let h=0;h<hours;h++){
-  for(let i=0;i<increments;i++){
-    const div = document.createElement("div");
-    const date = new Date();
-    date.setHours(h,i*30,0,0);
-    div.textContent = date.toLocaleTimeString([], {hour:'2-digit',minute:'2-digit'});
-    labelsEl.appendChild(div);
-  }
+loginSubmit.addEventListener('click', () => {
+  if(loginUser.value.trim()===LOGIN_USER && loginPass.value===LOGIN_PASS){
+    localStorage.setItem('ef-auth','true'); loginOverlay.style.display='none'; enterEditMode();
+  } else alert('Invalid credentials');
+});
+
+document.addEventListener('keydown', e => {
+  if(e.key==='Escape' && loginOverlay.style.display==='flex') loginOverlay.style.display='none';
+});
+
+/* ================= LOADING / DISPLAY LOGIC ================= */
+function loadSavedToMap(member){
+  if(!member) return {};
+  const raw = localStorage.getItem('availability-'+member);
+  if(!raw) return {};
+  let saved;
+  try{ saved=JSON.parse(raw); } catch{return {};}
+  const counts={};
+  saved.forEach(({day,hourUTC,minuteUTC})=>{
+    const temp = new Date(); temp.setUTCHours(hourUTC,minuteUTC,0,0);
+    const row = temp.getHours()*INCREMENTS + (temp.getMinutes()>=30?1:0);
+    const idx = row*7 + (day%7);
+    counts[idx]=(counts[idx]||0)+1;
+  });
+  return counts;
 }
 
-// Generate 7x48 grid cells
-for(let row=0;row<hours*increments;row++){
-  for(let day=0;day<days.length;day++){
-    const cell = document.createElement("div");
-    cell.className="availability-cell";
-    gridEl.appendChild(cell);
-  }
+function showGradientViewFor(member){
+  clearAllCells();
+  const counts = loadSavedToMap(member);
+  const cells=[...gridEl.children];
+  Object.entries(counts).forEach(([idxStr,count])=>{
+    const idx=Number(idxStr);
+    const intensity=Math.min(count,3)/3;
+    const opacity=0.2 + 0.6*intensity;
+    cells[idx].style.background=`rgba(106,166,255,${opacity})`;
+  });
 }
+
+function loadEditModeFor(member){
+  clearAllCells();
+  const counts=loadSavedToMap(member);
+  const cells=[...gridEl.children];
+  Object.entries(counts).forEach(([idxStr,count])=>{
+    const idx=Number(idxStr);
+    if(cells[idx]) cells[idx].classList.add('active');
+  });
+}
+
+/* ================= MODE TOGGLE ================= */
+function enterEditMode(){
+  if(isEditing) return;
+  isEditing=true;
+  editControls.style.display='flex'; editBtn.style.display='none';
+  [...gridEl.children].forEach(c=>{ c.classList.add('editable'); c.style.background=''; });
+  const member = memberSelect.value;
+  loadEditModeFor(member);
+}
+function exitEditMode(){
+  if(!isEditing) return;
+  isEditing=false;
+  editControls.style.display='none'; editBtn.style.display='inline-block';
+  [...gridEl.children].forEach(c=>{ c.classList.remove('editable'); c.classList.remove('active'); c.style.background=''; });
+  const member=memberSelect.value;
+  showGradientViewFor(member);
+}
+
+/* ================= MEMBER SELECT ================= */
+memberSelect.addEventListener('change', ()=>{
+  const member=memberSelect.value;
+  if(isEditing) loadEditModeFor(member);
+  else showGradientViewFor(member);
+});
+
+/* ================= SAVE / CANCEL ================= */
+saveBtn.addEventListener('click', ()=>{
+  const member=memberSelect.value;
+  if(!member){ alert('Select a member first'); return; }
+  const cells=[...gridEl.children];
+  const activeEntries=[];
+  cells.forEach((cell,i)=>{
+    if(!cell.classList.contains('active')) return;
+    const row=Math.floor(i/7); const day=i%7;
+    const localHour=Math.floor(row/INCREMENTS); const localMinute=(row%INCREMENTS)*30;
+    const temp=new Date(); temp.setHours(localHour,localMinute,0,0);
+    const hourUTC=temp.getUTCHours(); const minuteUTC=temp.getUTCMinutes();
+    activeEntries.push({day,hourUTC,minuteUTC});
+  });
+  try{
+    localStorage.setItem('availability-'+member,JSON.stringify(activeEntries));
+    exitEditMode();
+    showGradientViewFor(member);
+    alert('Saved.');
+  } catch(e){ console.error(e); alert('Save failed.'); }
+});
+cancelBtn.addEventListener('click', ()=>{ exitEditMode(); });
+
+/* ================= INITIAL STATE ================= */
+showGradientViewFor('');
+if(isLoggedIn()) editBtn.style.display='inline-block';
 </script>
-
 </body>
 </html>

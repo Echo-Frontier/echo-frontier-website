@@ -18,7 +18,9 @@
   <a href="index.html">Home</a>
   <a href="members.html" class="active">Members</a>
   <a href="availability.html">Availability</a>
+  <a href="contact.html">Contact</a>
 </nav>
+
 
 <main>
   <h2>Members</h2>
@@ -29,16 +31,23 @@
 </main>
 
 <script>
-  fetch('data/team.json')
-    .then(response => response.json())
+  // Absolute path relative to repo root
+  const jsonPath = './data/team.json';
+
+  fetch(jsonPath)
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to fetch team.json: ' + response.status);
+      return response.json();
+    })
     .then(team => {
       const container = document.getElementById('members-grid');
       container.innerHTML = '';
 
       team.forEach(member => {
         const card = document.createElement('div');
-        card.classList.add('member-card');
+        card.className = 'member-card';
 
+        // Use the same avatar path as in JSON
         card.innerHTML = `
           <img src="${member.avatar}" alt="${member.name}">
           <div class="member-name">${member.name}</div>
@@ -49,7 +58,9 @@
       });
     })
     .catch(err => {
-      console.error('Failed to load team data:', err);
+      const container = document.getElementById('members-grid');
+      container.innerHTML = '<p>Failed to load team members. Check console.</p>';
+      console.error(err);
     });
 </script>
 
