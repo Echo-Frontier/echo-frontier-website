@@ -24,29 +24,35 @@
 
 <main>
   <style>
-    /* Projects grid layout */
+    /* Projects wrapper — behaves like a normal block, doesn't shift */
     #projects-container {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-      gap: 16px;
+      margin: 0 auto;
+      padding: 16px 0;
     }
 
-    /* Each project card */
-    #projects-container > * {
+    /* Individual project cards */
+    #projects-container > div {
+      display: inline-block;       /* lay them out in a row naturally */
+      width: 200px;                /* fixed width to prevent resizing */
+      margin: 8px;                 /* spacing between cards */
       transition: transform 0.2s ease, box-shadow 0.2s ease;
-      will-change: transform;
+      vertical-align: top;         /* keeps inline-blocks aligned */
     }
 
-    /* Hover effect without changing layout */
-    #projects-container > *:hover {
-      transform: scale(1.05); /* grows visually but does not affect grid size */
+    /* Hover effect without affecting container size */
+    #projects-container > div:hover {
+      transform: scale(1.05);
       box-shadow: 0 4px 12px rgba(0,0,0,0.3);
-      z-index: 1; /* keeps hover above neighbors */
+      z-index: 1;
     }
   </style>
 
-  <div id="projects-container" class="projects-grid">
-    <!-- Projects will be injected here -->
+  <div id="projects-container">
+    <!-- Each project as a separate div -->
+    <div class="project-card">Project 1</div>
+    <div class="project-card">Project 2</div>
+    <div class="project-card">Project 3</div>
+    <!-- Add more projects as needed -->
   </div>
 </main>
 
