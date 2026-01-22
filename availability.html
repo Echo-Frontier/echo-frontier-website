@@ -127,8 +127,8 @@ const LOGIN_PASS = '3ch0Fr0ntier';
   - Set JSONBIN_API_KEY to your JSONBin "Secret Key" (required for write/PUT).
   - If BIN_ID is empty, the script falls back to localStorage (no remote reads/writes).
 */
-const BIN_ID = "6971832743b1c97be94097bd"; // e.g. "5f1a2b3c4d5e6f7g8h9i0j"
-const JSONBIN_API_KEY = "$2a$10$edrLHMqxcyBUAdf6kSKuOeInAbA8ZzPVUdLe4pntkXe1BGw5RJCSe"; // your X-Master-Key (required to update the bin)
+const BIN_ID = "6971832743b1c97be94097bd";
+const JSONBIN_API_KEY = "$2a$10$edrLHMqxcyBUAdf6kSKuOeInAbA8ZzPVUdLe4pntkXe1BGw5RJCSe";
 const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
 
 /* ================= ELEMENTS ================= */
@@ -152,7 +152,6 @@ let isEditing = false;
 let isDragging = false;
 let dragState = null; // true = set active, false = unset
 let binData = null; // global, single source of truth
-
 
 /* ================= BUILD GRID ================= */
 function buildGrid() {
@@ -234,62 +233,43 @@ document.addEventListener('keydown', e => {
 async function fetchBin() {
   if (!BIN_ID) return null;
 
-  const resp = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
-    headers: {
-      "X-Master-Key": JSONBIN_API_KEY
-    }
-  });
+  const url = `${JSONBIN_BASE}/${BIN_ID}/latest`;
+  const headers = {};
+  // include master key for private bins; safe for localhost/personal use but not for public sites
+  if (JSONBIN_API_KEY) headers['X-Master-Key'] = JSONBIN_API_KEY;
 
+  const resp = await fetch(url, { headers });
   if (!resp.ok) {
+    // return null to allow fallback to localStorage
     throw new Error(`Fetch failed ${resp.status}`);
   }
 
   const json = await resp.json();
 
-  // 🔑 CRITICAL: always return the RECORD only
-  if (json && typeof json === "object" && json.record) {
-    return json.record;
+  // JSONBin v3 wraps stored data in `record`
+  if (json && typeof json === 'object') {
+    if (json.record) return json.record;
+    // handle unexpected direct-record case
+    return json;
   }
-
   return null;
 }
-
 
 async function putBin(newData) {
   if(!BIN_ID) throw new Error('BIN_ID not set');
   if(!JSONBIN_API_KEY) throw new Error('Missing JSONBIN_API_KEY. Writes require your master key.');
   const url = `${JSONBIN_BASE}/${BIN_ID}`;
-  const headers = {
-    'Content-Type': 'application/json',
-    'X-Master-Key': JSONBIN_API_KEY
-  };
-  const resp = await fetch(url, {
-    method: 'PUT',
-    headers,
-    body: JSON.stringify(newData)
-  });
-  if(!resp.ok) {
-    const body = await resp.text().catch(()=>'');
-    throw new Error(`PUT failed ${resp.status}: ${body}`);
-  }
-  const payload = await resp.json().catch(()=>null);
-  return payload;
-}async function putBin(newData) {
-  const url = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
-
   const resp = await fetch(url, {
     method: "PUT",
     headers: {
       "Content-Type": "application/json",
       "X-Master-Key": JSONBIN_API_KEY
     },
-    body: JSON.stringify({
-      record: newData
-    })
+    body: JSON.stringify({ record: newData })
   });
 
   if (!resp.ok) {
-    const text = await resp.text();
+    const text = await resp.text().catch(()=>'');
     throw new Error(`JSONBin PUT failed ${resp.status}: ${text}`);
   }
 
@@ -317,27 +297,43 @@ function membersFromDefault() {
   ];
 }
 
-function availabilityMapFromMembers(binData, memberName) {
-  if (!binData || !Array.isArray(binData.members) || !memberName) {
-    return {};
+function populateMemberSelect(fromBin) {
+  // clear existing options
+  memberSelect.innerHTML = '';
+  const blank = document.createElement('option');
+  blank.value = '';
+  blank.textContent = 'Select member';
+  memberSelect.appendChild(blank);
+
+  let list = [];
+  if (fromBin && Array.isArray(fromBin.members) && fromBin.members.length) {
+    list = fromBin.members.map(m => m.name);
+  } else {
+    list = membersFromDefault().map(m => m.name);
   }
 
-  const member = binData.members.find(m => m.name === memberName);
-  if (!member || !Array.isArray(member.availability)) {
-    return {};
-  }
+  list.forEach(name => {
+    const opt = document.createElement('option');
+    opt.value = name;
+    opt.textContent = name;
+    memberSelect.appendChild(opt);
+  });
+}
+
+function availabilityMapFromMembers(bin, memberName) {
+  if (!bin || !Array.isArray(bin.members) || !memberName) return {};
+
+  const member = bin.members.find(m => m.name === memberName);
+  if (!member || !Array.isArray(member.availability)) return {};
 
   const counts = {};
   member.availability.forEach(({ day, hourUTC, minuteUTC }) => {
     const temp = new Date();
     temp.setUTCHours(hourUTC, minuteUTC, 0, 0);
-    const row =
-      temp.getHours() * INCREMENTS +
-      (temp.getMinutes() >= 30 ? 1 : 0);
+    const row = temp.getHours() * INCREMENTS + (temp.getMinutes() >= 30 ? 1 : 0);
     const idx = row * 7 + (day % 7);
     counts[idx] = (counts[idx] || 0) + 1;
   });
-
   return counts;
 }
 
@@ -345,65 +341,83 @@ function loadSavedToMap_local(member){
   if(!member) return {};
   const raw = localStorage.getItem('availability-'+member);
   if(!raw) return {};
-  try{ const saved = JSON.parse(raw); return saved.reduce((acc,e)=>{ const temp = new Date(); temp.setUTCHours(e.hourUTC,e.minuteUTC,0,0); const row = temp.getHours()*INCREMENTS + (temp.getMinutes()>=30?1:0); const idx = row*7 + (e.day%7); acc[idx]=(acc[idx]||0)+1; return acc; }, {}); } catch { return {}; }
+  try{
+    const saved = JSON.parse(raw);
+    return saved.reduce((acc,e)=>{
+      const temp = new Date();
+      temp.setUTCHours(e.hourUTC,e.minuteUTC,0,0);
+      const row = temp.getHours()*INCREMENTS + (temp.getMinutes()>=30?1:0);
+      const idx = row*7 + (e.day%7);
+      acc[idx]=(acc[idx]||0)+1;
+      return acc;
+    }, {});
+  } catch {
+    return {};
+  }
 }
 
-function showGradientViewFor_memberData(member, binData) {
+function showGradientViewFor_memberData(member, bin) {
   clearAllCells();
+  if (!member) return; // don't clear if no member selected; keep grid empty
 
+  // prefer remote data if available, else localstorage fallback
   let counts = {};
-  if (binData) {
-    counts = availabilityMapFromMembers(binData, member);
-  }
+  if (bin) counts = availabilityMapFromMembers(bin, member);
+  if (Object.keys(counts).length === 0) counts = loadSavedToMap_local(member);
 
   const cells = [...gridEl.children];
   Object.entries(counts).forEach(([idxStr, count]) => {
     const idx = Number(idxStr);
     const intensity = Math.min(count, 3) / 3;
     const opacity = 0.2 + 0.6 * intensity;
-    if (cells[idx]) {
-      cells[idx].style.background = `rgba(106,166,255,${opacity})`;
-    }
+    if (cells[idx]) cells[idx].style.background = `rgba(106,166,255,${opacity})`;
   });
 }
 
-function loadEditModeFor_memberData(member, binData) {
+function loadEditModeFor_memberData(member, bin) {
   clearAllCells();
+  if (!member) return;
 
   let counts = {};
-  if (binData) {
-    counts = availabilityMapFromMembers(binData, member);
-  }
+  if (bin) counts = availabilityMapFromMembers(bin, member);
+  if (Object.keys(counts).length === 0) counts = loadSavedToMap_local(member);
 
   const cells = [...gridEl.children];
   Object.entries(counts).forEach(([idxStr]) => {
     const idx = Number(idxStr);
-    if (cells[idx]) {
-      cells[idx].classList.add('active');
-    }
+    if (cells[idx]) cells[idx].classList.add('active');
   });
 }
 
 /* ================= MODE TOGGLE ================= */
 function enterEditMode(){
   if(isEditing) return;
+  const member = memberSelect.value;
+  if(!member){ alert('Select a member first'); return; }
+
   isEditing=true;
-  editControls.style.display='flex'; editBtn.style.display='none';
+  editControls.style.display='flex';
+  editBtn.style.display='none';
   [...gridEl.children].forEach(c=>{ c.classList.add('editable'); c.style.background=''; });
-  // load current member edit state from remote/local
-  loadAndRenderCurrentMember(true);
+  loadEditModeFor_memberData(member, binData);
 }
 function exitEditMode(){
   if(!isEditing) return;
   isEditing=false;
-  editControls.style.display='none'; editBtn.style.display='inline-block';
+  editControls.style.display='none';
+  editBtn.style.display='inline-block';
   [...gridEl.children].forEach(c=>{ c.classList.remove('editable'); c.classList.remove('active'); c.style.background=''; });
-  // render gradient view from remote/local
-  loadAndRenderCurrentMember(false);
+  const member = memberSelect.value;
+  if(member) showGradientViewFor_memberData(member, binData);
 }
 
 /* ================= MEMBER SELECT ================= */
-memberSelect.addEventListener('change', ()=>{ loadAndRenderCurrentMember(isEditing); });
+memberSelect.addEventListener('change', ()=>{ 
+  const member = memberSelect.value;
+  if(!member){ clearAllCells(); return; }
+  if(isEditing) loadEditModeFor_memberData(member, binData);
+  else showGradientViewFor_memberData(member, binData);
+});
 
 /* ================= SAVE / CANCEL ================= */
 async function saveBtnHandler(){
@@ -421,12 +435,12 @@ async function saveBtnHandler(){
     activeEntries.push({day,hourUTC,minuteUTC});
   });
 
-  // If BIN_ID is set, attempt network save; otherwise fallback to localStorage
+  // If BIN_ID is empty, save locally
   if(!BIN_ID){
     try{
       localStorage.setItem('availability-'+member, JSON.stringify(activeEntries));
       exitEditMode();
-      showGradientViewFor_memberData(member, null);
+      showGradientViewFor_memberData(member, binData);
       alert('Saved locally (no BIN_ID configured).');
       return;
     } catch(e){
@@ -436,47 +450,49 @@ async function saveBtnHandler(){
     }
   }
 
-  // Remote save: read existing bin (or create default), update the relevant member, then PUT
+  // Remote save: update the global binData, PUT, then re-fetch authoritative bin and re-render
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
   try {
-    let bin = await fetchBin();
-    if(!bin){
-      // initialize structure if bin missing
-      bin = { members: membersFromDefault(), lastUpdated: null };
-    } else {
-      // ensure expected shape
-      if(!Array.isArray(bin.members)) bin.members = membersFromDefault();
-    }
+    // ensure binData is initialized
+    if(!binData) binData = { members: membersFromDefault(), lastUpdated: null };
+    if(!Array.isArray(binData.members)) binData.members = membersFromDefault();
 
-    // find member entry by name - if not found, add one
-    let m = bin.members.find(x => x.name === member);
+    let m = binData.members.find(x => x.name === member);
     if(!m){
-      // add new member entry
-      m = { id: bin.members.length + 1, name: member, availability: [] };
-      bin.members.push(m);
+      m = { id: binData.members.length + 1, name: member, availability: [] };
+      binData.members.push(m);
     }
-    // replace availability
     m.availability = activeEntries;
+    binData.lastUpdated = new Date().toISOString();
 
-    bin.lastUpdated = new Date().toISOString();
+    // write authoritative copy
+    await putBin(binData);
 
-    // write back
-    await putBin(bin);
+    // re-fetch authoritative bin to refresh any server-side normalization
+    try {
+      const fresh = await fetchBin();
+      if (fresh && Array.isArray(fresh.members)) binData = fresh;
+    } catch (e) {
+      console.warn('Re-fetch after put failed; continuing with local binData', e);
+    }
 
-    // also mirror locally for offline fallback
+    // mirror locally for offline fallback
     localStorage.setItem('availability-'+member, JSON.stringify(activeEntries));
 
     exitEditMode();
-    showGradientViewFor_memberData(member, bin);
+    showGradientViewFor_memberData(member, binData);
+    // re-populate select if members list changed
+    populateMemberSelect(binData);
+
     alert('Saved to JSONBin.');
   } catch (err) {
     console.error('Save to bin failed:', err);
-    // fallback: try localStorage and inform user
+    // fallback: localStorage
     try {
       localStorage.setItem('availability-'+member, JSON.stringify(activeEntries));
       exitEditMode();
-      showGradientViewFor_memberData(member, null);
+      showGradientViewFor_memberData(member, binData);
       alert('Save to JSONBin failed; saved locally instead.');
     } catch(e){
       alert('Save failed (remote and local). Check console for errors.');
@@ -491,25 +507,44 @@ saveBtn.addEventListener('click', saveBtnHandler);
 cancelBtn.addEventListener('click', ()=>{ exitEditMode(); });
 
 /* ================= LOAD & RENDER ON OPEN ================= */
-async function loadAndRenderCurrentMember(editMode){
-  const member = memberSelect.value;
-  let binData = null;
+async function initialLoad(){
+  // try remote bin if configured
   if(BIN_ID){
-    binData = await fetchBin().catch(()=>null);
+    try {
+      const fetched = await fetchBin();
+      if (fetched && typeof fetched === 'object') binData = fetched;
+      else binData = { members: membersFromDefault(), lastUpdated: null };
+    } catch (e) {
+      console.warn('Initial fetch failed; using defaults/local. Error:', e);
+      binData = { members: membersFromDefault(), lastUpdated: null };
+    }
+  } else {
+    binData = { members: membersFromDefault(), lastUpdated: null };
   }
-  if(editMode) loadEditModeFor_memberData(member, binData);
-  else showGradientViewFor_memberData(member, binData);
+
+  // populate member select from binData
+  populateMemberSelect(binData);
+
+  // If no selection is made, choose first member for convenience (optional)
+  if (!memberSelect.value && memberSelect.options.length > 1) {
+    memberSelect.selectedIndex = 1; // selects first actual member (index 0 is "Select member")
+  }
+
+  // render current selection (if any)
+  const member = memberSelect.value;
+  if (member) {
+    showGradientViewFor_memberData(member, binData);
+  } else {
+    clearAllCells();
+  }
+
+  if(isLoggedIn()) editBtn.style.display='inline-block';
 }
 
-/* initial load: read remote (if available) and render gradient for empty selection */
-(async function initialLoad(){
-  let binData = null;
-  if(BIN_ID){
-    binData = await fetchBin().catch(()=>null);
-  }
-  showGradientViewFor_memberData('', binData);
-})();
+// run on open
+initialLoad();
 
 </script>
+
 </body>
 </html>
