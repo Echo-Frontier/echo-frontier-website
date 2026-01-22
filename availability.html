@@ -261,7 +261,7 @@ async function fetchBin() {
 
 async function putBin(newData) {
   if (!BIN_ID) throw new Error('BIN_ID not set');
-  if (!JSONBIN_API_KEY) throw new Error('Missing JSONBIN_API_KEY for writes');
+  if (!JSONBIN_API_KEY) throw new Error('Missing JSONBIN_API_KEY');
 
   const url = `${JSONBIN_BASE}/${BIN_ID}`;
 
@@ -271,19 +271,16 @@ async function putBin(newData) {
       'Content-Type': 'application/json',
       'X-Master-Key': JSONBIN_API_KEY
     },
-    // wrap in record object (required by v3)
+    // ✅ Only wrap once
     body: JSON.stringify({ record: newData })
   });
 
   if (!resp.ok) {
-    const txt = await resp.text().catch(()=>'<no body>');
+    const txt = await resp.text().catch(() => '<no body>');
     throw new Error(`JSONBin PUT failed ${resp.status}: ${txt}`);
   }
 
-  const result = await resp.json();
-
-  // Ensure we always return updated bin object, not a new record
-  return newData;
+  return newData; // return the object we just wrote
 }
 
 /* ================= MEMBERS & DROPDOWN ================= */
