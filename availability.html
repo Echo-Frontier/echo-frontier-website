@@ -121,9 +121,9 @@ const ROWS = HOURS * INCREMENTS;
 const LOGIN_USER = 'EchoFrontier';
 const LOGIN_PASS = '3ch0Fr0ntier';
 
-/* JSONBin config - replace if needed */
-const BIN_ID = "6971832743b1c97be94097bd";
-const JSONBIN_API_KEY = "$2a$10$edrLHMqxcyBUAdf6kSKuOeInAbA8ZzPVUdLe4pntkXe1BGw5RJCSe";
+/* JSONBin config */
+const BIN_ID = "6971832743b1c97be94097bd"; // set your real bin id
+const JSONBIN_API_KEY = "$2a$10$edrLHMqxcyBUAdf6kSKuOeInAbA8ZzPVUdLe4pntkXe1BGw5RJCSe"; // set your master key
 const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
 
 /* ================= ELEMENTS ================= */
@@ -146,18 +146,16 @@ const loginSubmit = document.getElementById('loginSubmit');
 let isEditing = false;
 let isDragging = false;
 let dragState = null;
-let binData = null; // canonical server-side state (normalized)
+let binData = null;
 
 /* ================= BUILD GRID ================= */
 function buildGrid() {
-  // days header
   days.forEach(d => {
     const div = document.createElement('div');
     div.textContent = d;
     daysHeaderEl.appendChild(div);
   });
 
-  // time labels
   for (let h = 0; h < HOURS; h++) {
     for (let i = 0; i < INCREMENTS; i++) {
       const div = document.createElement('div');
@@ -168,14 +166,12 @@ function buildGrid() {
     }
   }
 
-  // cells
   for (let r = 0; r < ROWS; r++) {
     for (let c = 0; c < 7; c++) {
       const cell = document.createElement('div');
       cell.className = 'availability-cell';
       cell.dataset.index = (r * 7 + c).toString();
 
-      // drawing interaction (only active in edit mode)
       cell.addEventListener('mousedown', e => {
         if (!isEditing || e.button !== 0) return;
         e.preventDefault();
@@ -200,90 +196,89 @@ buildGrid();
 function isLoggedIn(){ return localStorage.getItem('ef-auth') === 'true'; }
 function clearAllCells(){ [...gridEl.children].forEach(c=>{ c.classList.remove('active'); c.style.background = ''; }); }
 
-/*
-  Time conversion strategy:
-
-  - Stored canonical representation: store weekday/day, hourUTC, minuteUTC where day is the UTC weekday (0=Sun..6=Sat)
-    This makes stored availability timezone-neutral.
-
-  - To display (local):
-    Given stored (dayUTC, hourUTC, minuteUTC), compute a UTC timestamp anchored to a reference week,
-    then convert that timestamp to local time and compute the grid index (localDay, localHour, localMinute).
-
-  - To save (from a local grid cell):
-    Given the local grid cell (localRow, localCol), construct a Date in local timezone anchored to same reference week,
-    then read its UTC day/hour/minute and store those (dayUTC, hourUTC, minuteUTC).
-*/
-
-/* Convert stored UTC-based entry -> local grid index */
+/* Use a stable reference week to convert between UTC storage and local display */
 function utcToLocalIndex(hourUTC, minuteUTC, dayUTC) {
-  // Use a reference week where 1970-01-04 is a Sunday. Add day offset so dayUTC maps correctly.
   const utcMillis = Date.UTC(1970, 0, 4 + dayUTC, hourUTC, minuteUTC, 0);
-  const local = new Date(utcMillis); // local-time representation of that UTC instant
-  const localDay = local.getDay(); // 0-6 local weekday
+  const local = new Date(utcMillis);
+  const localDay = local.getDay();
   const localHour = local.getHours();
   const localMinute = local.getMinutes();
   const row = localHour * INCREMENTS + (localMinute >= 30 ? 1 : 0);
   return row * 7 + localDay;
 }
 
-/* Convert a local grid index -> UTC-based stored entry */
 function localIndexToUtc(row, col) {
-  // row -> localHour/localMinute; col -> local weekday (0-6)
   const localHour = Math.floor(row / INCREMENTS);
   const localMinute = (row % INCREMENTS) * 30;
-  // Construct a date in LOCAL timezone anchored to that local weekday in reference week
+  // local weekday = col (0-6)
   const localDate = new Date(1970, 0, 4 + col, localHour, localMinute, 0);
-  const dayUTC = localDate.getUTCDay();
-  const hourUTC = localDate.getUTCHours();
-  const minuteUTC = localDate.getUTCMinutes();
-  return { day: dayUTC, hourUTC, minuteUTC };
+  return { day: localDate.getUTCDay(), hourUTC: localDate.getUTCHours(), minuteUTC: localDate.getUTCMinutes() };
 }
 
-/* ================= JSONBin API HELPERS ================= */
+/* ================= JSONBin: normalize + read/write ================= */
+/* Unwrap nested .record layers until we reach the deepest object that isn't just a wrapper */
+function unwrapRecordLayers(obj) {
+  let cur = obj;
+  // If fetch returned an object with "record" wrapper (possibly nested), unwrap
+  while (cur && typeof cur === 'object' && 'record' in cur && typeof cur.record === 'object') {
+    cur = cur.record;
+  }
+  return cur;
+}
+
 async function fetchBin() {
   if (!BIN_ID) return null;
-  const headers = JSONBIN_API_KEY ? { "X-Master-Key": JSONBIN_API_KEY } : {};
+  const headers = JSONBIN_API_KEY ? { 'X-Master-Key': JSONBIN_API_KEY } : {};
   const url = `${JSONBIN_BASE}/${BIN_ID}/latest`;
-
   const resp = await fetch(url, { headers, cache: 'no-store' });
   if (!resp.ok) throw new Error(`Fetch failed ${resp.status}`);
-
   const json = await resp.json();
-  // normalize v3 record wrapper
-  let data = json && json.record ? json.record : json;
+  const unwrapped = unwrapRecordLayers(json);
   // ensure shape
-  if (!data || typeof data !== 'object') data = {};
+  let data = unwrapped && typeof unwrapped === 'object' ? unwrapped : {};
   if (!Array.isArray(data.members)) data.members = membersFromDefault();
   data.members.forEach(m => { if (!Array.isArray(m.availability)) m.availability = []; });
   return data;
 }
 
-async function putBin(newData) {
+/* Put must write a single clean record object (no nested `record`) then re-fetch authoritative copy */
+async function putBinReplace(newData) {
   if (!BIN_ID) throw new Error('BIN_ID not set');
-  if (!JSONBIN_API_KEY) throw new Error('Missing JSONBIN_API_KEY');
+  if (!JSONBIN_API_KEY) throw new Error('Missing JSONBIN_API_KEY for writes');
+
+  // Build a clean payload (avoid nested "record" fields that might exist in newData)
+  const clean = {
+    members: Array.isArray(newData.members) ? newData.members : [],
+    lastUpdated: newData.lastUpdated || new Date().toISOString()
+  };
 
   const url = `${JSONBIN_BASE}/${BIN_ID}`;
-
   const resp = await fetch(url, {
     method: 'PUT',
     headers: {
       'Content-Type': 'application/json',
       'X-Master-Key': JSONBIN_API_KEY
     },
-    // ✅ Only wrap once
-    body: JSON.stringify({ record: newData })
+    body: JSON.stringify({ record: clean })
   });
 
   if (!resp.ok) {
-    const txt = await resp.text().catch(() => '<no body>');
+    const txt = await resp.text().catch(()=>'<no body>');
     throw new Error(`JSONBin PUT failed ${resp.status}: ${txt}`);
   }
 
-  return newData; // return the object we just wrote
+  // Re-fetch authoritative data and return it (prevents client/server shape mismatch)
+  try {
+    const fresh = await fetchBin();
+    return fresh;
+  } catch (e) {
+    // If re-fetch fails, return the clean object as best-effort
+    console.warn('Re-fetch after PUT failed, returning clean payload', e);
+    return clean;
+  }
 }
 
-/* ================= MEMBERS & DROPDOWN ================= */
+/* ================= MEMBERS & UI ================= */
 function membersFromDefault() {
   return [
     { id: 1, name: "Speedix08", availability: [] },
@@ -295,21 +290,17 @@ function membersFromDefault() {
 }
 
 function populateMemberSelect() {
-  // preserve selection if possible
   const prev = memberSelect.value || '';
   memberSelect.innerHTML = '';
   const blank = document.createElement('option'); blank.value = ''; blank.textContent = 'Select member';
   memberSelect.appendChild(blank);
-
-  const list = Array.isArray(binData && binData.members) ? binData.members : membersFromDefault();
+  const list = (binData && Array.isArray(binData.members)) ? binData.members : membersFromDefault();
   list.forEach(m => {
     const opt = document.createElement('option');
     opt.value = m.name;
     opt.textContent = m.name;
     memberSelect.appendChild(opt);
   });
-
-  // restore selection if still present
   if (prev) {
     const found = [...memberSelect.options].some(o => o.value === prev);
     if (found) memberSelect.value = prev;
@@ -317,8 +308,6 @@ function populateMemberSelect() {
 }
 
 /* ================= RENDERING ================= */
-
-/* Combined gradient overlay (all members) */
 function applyGradientOverlay() {
   clearAllCells();
   if (!binData || !Array.isArray(binData.members)) return;
@@ -327,7 +316,6 @@ function applyGradientOverlay() {
   binData.members.forEach(member => {
     if (!Array.isArray(member.availability)) return;
     member.availability.forEach(({ day, hourUTC, minuteUTC }) => {
-      // ignore malformed entries
       if (typeof day !== 'number' || typeof hourUTC !== 'number') return;
       const idx = utcToLocalIndex(hourUTC, minuteUTC, day);
       counts[idx] = (counts[idx] || 0) + 1;
@@ -338,20 +326,17 @@ function applyGradientOverlay() {
   Object.entries(counts).forEach(([idxStr, count]) => {
     const idx = Number(idxStr);
     if (!Number.isFinite(idx) || idx < 0 || idx >= cells.length) return;
-    // intensity scale: 1 => subtle, 3+ => max
     const intensity = Math.min(count, 3) / 3;
-    const opacity = 0.22 + 0.6 * intensity; // baseline visibility
+    const opacity = 0.22 + 0.6 * intensity;
     cells[idx].style.background = `rgba(106,166,255,${opacity})`;
   });
 }
 
-/* Load a single member for editing (full-color cells) */
 function loadMemberForEdit(memberName) {
   clearAllCells();
   if (!memberName || !binData || !Array.isArray(binData.members)) return;
   const member = binData.members.find(m => m.name === memberName);
   if (!member || !Array.isArray(member.availability)) return;
-
   const cells = [...gridEl.children];
   member.availability.forEach(({ day, hourUTC, minuteUTC }) => {
     if (typeof day !== 'number' || typeof hourUTC !== 'number') return;
@@ -360,7 +345,7 @@ function loadMemberForEdit(memberName) {
   });
 }
 
-/* ================= LOGIN / AUTH UI ================= */
+/* ================= LOGIN/AUTH ================= */
 editBtn.addEventListener('click', () => {
   if (isLoggedIn()) enterEditMode();
   else { loginOverlay.style.display = 'flex'; loginUser.focus(); }
@@ -383,7 +368,7 @@ function enterEditMode() {
   editControls.style.display = 'flex';
   editBtn.style.display = 'none';
   [...gridEl.children].forEach(c => { c.classList.add('editable'); c.style.background = ''; });
-  clearAllCells(); // blank grid on edit entry
+  clearAllCells();
   memberSelect.focus();
 }
 
@@ -396,70 +381,56 @@ function exitEditMode() {
   applyGradientOverlay();
 }
 
-/* ================= EVENT HANDLERS ================= */
+/* ================= EVENTS ================= */
 memberSelect.addEventListener('change', () => {
-  // if binData isn't loaded yet, no-op (initialLoad will repopulate later)
   if (!binData) return;
-  if (isEditing) {
-    loadMemberForEdit(memberSelect.value);
-  } else {
-    applyGradientOverlay();
-  }
+  if (isEditing) loadMemberForEdit(memberSelect.value);
+  else applyGradientOverlay();
 });
 
-/* ================= SAVE LOGIC ================= */
+/* ================= SAVE (uses putBinReplace to avoid double-wrapping) ================= */
 async function saveBtnHandler() {
   const memberName = memberSelect.value;
   if (!memberName) { alert('Select a member before saving'); return; }
 
-  // collect active cells -> convert to UTC entries
   const cells = [...gridEl.children];
   const newAvailability = [];
   cells.forEach((cell, i) => {
     if (!cell.classList.contains('active')) return;
     const row = Math.floor(i / 7);
-    const col = i % 7; // local weekday 0-6
-    const { day: dayUTC, hourUTC, minuteUTC } = localIndexToUtc(row, col);
-    // dedupe
-    if (!newAvailability.find(e => e.day === dayUTC && e.hourUTC === hourUTC && e.minuteUTC === minuteUTC)) {
-      newAvailability.push({ day: dayUTC, hourUTC, minuteUTC });
+    const col = i % 7; // local weekday
+    const { day, hourUTC, minuteUTC } = localIndexToUtc(row, col);
+    if (!newAvailability.find(e => e.day === day && e.hourUTC === hourUTC && e.minuteUTC === minuteUTC)) {
+      newAvailability.push({ day, hourUTC, minuteUTC });
     }
   });
 
-  // Update canonical binData in memory
   if (!binData) binData = { members: membersFromDefault(), lastUpdated: null };
   if (!Array.isArray(binData.members)) binData.members = membersFromDefault();
 
-  let m = binData.members.find(x => x.name === memberName);
-  if (!m) {
-    m = { id: binData.members.length + 1, name: memberName, availability: [] };
-    binData.members.push(m);
+  let member = binData.members.find(m => m.name === memberName);
+  if (!member) {
+    member = { id: binData.members.length + 1, name: memberName, availability: [] };
+    binData.members.push(member);
   }
-  m.availability = newAvailability;
+  member.availability = newAvailability;
   binData.lastUpdated = new Date().toISOString();
 
-  // write to JSONBin, then re-fetch authoritative copy and re-render gradient
+  // write back cleanly and re-fetch authoritative copy
   saveBtn.disabled = true;
   saveBtn.textContent = 'Saving...';
   try {
-    await putBin(binData);
-    // re-fetch authoritative bin to avoid client/server shape mismatch
-    try {
-      const fresh = await fetchBin();
-      if (fresh && Array.isArray(fresh.members)) binData = fresh;
-    } catch (e) {
-      console.warn('Re-fetch after PUT failed; using local binData', e);
-    }
-    // mirror locally for offline fallback (optional)
-    try { localStorage.setItem('availability-' + memberName, JSON.stringify(m.availability)); } catch(e){}
-
-    // repopulate dropdown in case member list changed
+    const authoritative = await putBinReplace(binData);
+    // authoritative is normalized bin object
+    if (authoritative && Array.isArray(authoritative.members)) binData = authoritative;
+    // mirror locally
+    try { localStorage.setItem('availability-' + memberName, JSON.stringify(member.availability)); } catch(e){}
     populateMemberSelect();
     exitEditMode();
     alert('Saved successfully.');
   } catch (err) {
     console.error('Save failed:', err);
-    // fallback: persist locally and still show gradient
+    // fallback local save
     try {
       localStorage.setItem('availability-' + memberName, JSON.stringify(newAvailability));
       exitEditMode();
@@ -475,7 +446,7 @@ async function saveBtnHandler() {
 saveBtn.addEventListener('click', saveBtnHandler);
 cancelBtn.addEventListener('click', exitEditMode);
 
-/* ================= INITIAL LOAD ================= */
+/* ================= INITIAL LOAD (normalize & merge local) ================= */
 async function initialLoad() {
   try {
     const fetched = await fetchBin();
@@ -486,7 +457,7 @@ async function initialLoad() {
     binData = { members: membersFromDefault(), lastUpdated: null };
   }
 
-  // Merge saved localStorage availability for any member (offline edits)
+  // merge any localStorage entries for offline edits
   try {
     binData.members.forEach(m => {
       const raw = localStorage.getItem('availability-' + m.name);
@@ -504,15 +475,13 @@ async function initialLoad() {
   } catch(_) {}
 
   populateMemberSelect();
-
-  // If no selection, choose the first member by default? We will not auto-select; gradient shows combined view.
   applyGradientOverlay();
-
   if (isLoggedIn()) editBtn.style.display = 'inline-block';
 }
 initialLoad();
 
 </script>
+
 
 </body>
 </html>
