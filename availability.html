@@ -491,7 +491,6 @@ cancelBtn.addEventListener('click', ()=>{ exitEditMode(); });
 /* ================= LOAD & RENDER ON OPEN ================= */
 async function loadAndRenderCurrentMember(editMode){
   const member = memberSelect.value;
-  // if BIN_ID provided, attempt to fetch bin, else use localStorage
   let binData = null;
   if(BIN_ID){
     binData = await fetchBin().catch(()=>null);
@@ -506,9 +505,7 @@ async function loadAndRenderCurrentMember(editMode){
   if(BIN_ID){
     binData = await fetchBin().catch(()=>null);
   }
-  // if bin exists but has members, and no selection, show combined gradient? We keep behavior: empty -> no gradient
   showGradientViewFor_memberData('', binData);
-  if(isLoggedIn()) editBtn.style.display='inline-block';
 })();
 
 </script>
