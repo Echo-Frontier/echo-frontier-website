@@ -121,6 +121,16 @@ const ROWS = HOURS * INCREMENTS;
 const LOGIN_USER = 'EchoFrontier';
 const LOGIN_PASS = '3ch0Fr0ntier';
 
+/* CONFIG: JSONBin */
+/*
+  - Set BIN_ID to your jsonbin.io bin id (the bin you created to hold availability).
+  - Set JSONBIN_API_KEY to your JSONBin "Secret Key" (required for write/PUT).
+  - If BIN_ID is empty, the script falls back to localStorage (no remote reads/writes).
+*/
+const BIN_ID = "6971832743b1c97be94097bd"; // e.g. "5f1a2b3c4d5e6f7g8h9i0j"
+const JSONBIN_API_KEY = "$2a$10$edrLHMqxcyBUAdf6kSKuOeInAbA8ZzPVUdLe4pntkXe1BGw5RJCSe"; // your X-Master-Key (required to update the bin)
+const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
+
 /* ================= ELEMENTS ================= */
 const daysHeaderEl = document.getElementById('daysHeader');
 const labelsEl = document.getElementById('timeLabels');
@@ -218,38 +228,110 @@ document.addEventListener('keydown', e => {
   if(e.key==='Escape' && loginOverlay.style.display==='flex') loginOverlay.style.display='none';
 });
 
+/* ================= JSONBin API HELPERS ================= */
+async function fetchBin() {
+  if(!BIN_ID) return null;
+  // Try to fetch the latest version (public read works with /latest)
+  const url = `${JSONBIN_BASE}/${BIN_ID}/latest`;
+  try {
+    // If an API key is provided, include it for full access
+    const headers = {};
+    if (JSONBIN_API_KEY) headers['X-Master-Key'] = JSONBIN_API_KEY;
+    const resp = await fetch(url, { headers });
+    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
+    const payload = await resp.json();
+    // JSONBin v3 wraps the stored JSON in `record`
+    return payload && payload.record ? payload.record : payload;
+  } catch (err) {
+    console.warn('Failed to fetch bin:', err);
+    return null;
+  }
+}
+
+async function putBin(newData) {
+  if(!BIN_ID) throw new Error('BIN_ID not set');
+  if(!JSONBIN_API_KEY) throw new Error('Missing JSONBIN_API_KEY. Writes require your master key.');
+  const url = `${JSONBIN_BASE}/${BIN_ID}`;
+  const headers = {
+    'Content-Type': 'application/json',
+    'X-Master-Key': JSONBIN_API_KEY
+  };
+  const resp = await fetch(url, {
+    method: 'PUT',
+    headers,
+    body: JSON.stringify(newData)
+  });
+  if(!resp.ok) {
+    const body = await resp.text().catch(()=>'');
+    throw new Error(`PUT failed ${resp.status}: ${body}`);
+  }
+  const payload = await resp.json().catch(()=>null);
+  return payload;
+}
+
 /* ================= LOADING / DISPLAY LOGIC ================= */
-function loadSavedToMap(member){
-  if(!member) return {};
-  const raw = localStorage.getItem('availability-'+member);
-  if(!raw) return {};
-  let saved;
-  try{ saved=JSON.parse(raw); } catch{return {};}
-  const counts={};
-  saved.forEach(({day,hourUTC,minuteUTC})=>{
-    const temp = new Date(); temp.setUTCHours(hourUTC,minuteUTC,0,0);
+/*
+  Data format expected in the bin:
+  {
+    members: [
+      { id: 1, name: "Speedix08", availability: [ { day:0, hourUTC:14, minuteUTC:30 }, ... ] },
+      ...
+    ],
+    lastUpdated: "2026-01-21T12:00:00Z"
+  }
+*/
+function membersFromDefault() {
+  return [
+    { id: 1, name: "Speedix08", availability: [] },
+    { id: 2, name: "GD_Abomination", availability: [] },
+    { id: 3, name: "SimLeek", availability: [] },
+    { id: 4, name: "Flame", availability: [] },
+    { id: 5, name: "Lele", availability: [] }
+  ];
+}
+
+function availabilityMapFromMembers(members, memberName){
+  if(!members || !memberName) return {};
+  const member = members.find(m => m.name === memberName);
+  if(!member || !Array.isArray(member.availability)) return {};
+  const counts = {};
+  member.availability.forEach(({day,hourUTC,minuteUTC})=>{
+    const temp = new Date();
+    temp.setUTCHours(hourUTC, minuteUTC, 0, 0);
     const row = temp.getHours()*INCREMENTS + (temp.getMinutes()>=30?1:0);
     const idx = row*7 + (day%7);
-    counts[idx]=(counts[idx]||0)+1;
+    counts[idx] = (counts[idx]||0) + 1;
   });
   return counts;
 }
 
-function showGradientViewFor(member){
+function loadSavedToMap_local(member){
+  if(!member) return {};
+  const raw = localStorage.getItem('availability-'+member);
+  if(!raw) return {};
+  try{ const saved = JSON.parse(raw); return saved.reduce((acc,e)=>{ const temp = new Date(); temp.setUTCHours(e.hourUTC,e.minuteUTC,0,0); const row = temp.getHours()*INCREMENTS + (temp.getMinutes()>=30?1:0); const idx = row*7 + (e.day%7); acc[idx]=(acc[idx]||0)+1; return acc; }, {}); } catch { return {}; }
+}
+
+function showGradientViewFor_memberData(member, membersData) {
   clearAllCells();
-  const counts = loadSavedToMap(member);
+  let counts = {};
+  if (membersData) counts = availabilityMapFromMembers(membersData, member);
+  // fallback to localStorage if no remote
+  if (Object.keys(counts).length === 0) counts = loadSavedToMap_local(member);
   const cells=[...gridEl.children];
   Object.entries(counts).forEach(([idxStr,count])=>{
     const idx=Number(idxStr);
     const intensity=Math.min(count,3)/3;
     const opacity=0.2 + 0.6*intensity;
-    cells[idx].style.background=`rgba(106,166,255,${opacity})`;
+    if(cells[idx]) cells[idx].style.background=`rgba(106,166,255,${opacity})`;
   });
 }
 
-function loadEditModeFor(member){
+function loadEditModeFor_memberData(member, membersData){
   clearAllCells();
-  const counts=loadSavedToMap(member);
+  let counts = {};
+  if (membersData) counts = availabilityMapFromMembers(membersData, member);
+  if (Object.keys(counts).length === 0) counts = loadSavedToMap_local(member);
   const cells=[...gridEl.children];
   Object.entries(counts).forEach(([idxStr,count])=>{
     const idx=Number(idxStr);
@@ -263,51 +345,129 @@ function enterEditMode(){
   isEditing=true;
   editControls.style.display='flex'; editBtn.style.display='none';
   [...gridEl.children].forEach(c=>{ c.classList.add('editable'); c.style.background=''; });
-  const member = memberSelect.value;
-  loadEditModeFor(member);
+  // load current member edit state from remote/local
+  loadAndRenderCurrentMember(true);
 }
 function exitEditMode(){
   if(!isEditing) return;
   isEditing=false;
   editControls.style.display='none'; editBtn.style.display='inline-block';
   [...gridEl.children].forEach(c=>{ c.classList.remove('editable'); c.classList.remove('active'); c.style.background=''; });
-  const member=memberSelect.value;
-  showGradientViewFor(member);
+  // render gradient view from remote/local
+  loadAndRenderCurrentMember(false);
 }
 
 /* ================= MEMBER SELECT ================= */
-memberSelect.addEventListener('change', ()=>{
-  const member=memberSelect.value;
-  if(isEditing) loadEditModeFor(member);
-  else showGradientViewFor(member);
-});
+memberSelect.addEventListener('change', ()=>{ loadAndRenderCurrentMember(isEditing); });
 
 /* ================= SAVE / CANCEL ================= */
-saveBtn.addEventListener('click', ()=>{
-  const member=memberSelect.value;
+async function saveBtnHandler(){
+  const member = memberSelect.value;
   if(!member){ alert('Select a member first'); return; }
-  const cells=[...gridEl.children];
-  const activeEntries=[];
+
+  const cells = [...gridEl.children];
+  const activeEntries = [];
   cells.forEach((cell,i)=>{
     if(!cell.classList.contains('active')) return;
-    const row=Math.floor(i/7); const day=i%7;
-    const localHour=Math.floor(row/INCREMENTS); const localMinute=(row%INCREMENTS)*30;
-    const temp=new Date(); temp.setHours(localHour,localMinute,0,0);
-    const hourUTC=temp.getUTCHours(); const minuteUTC=temp.getUTCMinutes();
+    const row = Math.floor(i/7); const day = i%7;
+    const localHour = Math.floor(row/INCREMENTS); const localMinute = (row%INCREMENTS)*30;
+    const temp = new Date(); temp.setHours(localHour,localMinute,0,0);
+    const hourUTC = temp.getUTCHours(); const minuteUTC = temp.getUTCMinutes();
     activeEntries.push({day,hourUTC,minuteUTC});
   });
-  try{
-    localStorage.setItem('availability-'+member,JSON.stringify(activeEntries));
+
+  // If BIN_ID is set, attempt network save; otherwise fallback to localStorage
+  if(!BIN_ID){
+    try{
+      localStorage.setItem('availability-'+member, JSON.stringify(activeEntries));
+      exitEditMode();
+      showGradientViewFor_memberData(member, null);
+      alert('Saved locally (no BIN_ID configured).');
+      return;
+    } catch(e){
+      console.error(e);
+      alert('Local save failed.');
+      return;
+    }
+  }
+
+  // Remote save: read existing bin (or create default), update the relevant member, then PUT
+  saveBtn.disabled = true;
+  saveBtn.textContent = 'Saving...';
+  try {
+    let bin = await fetchBin();
+    if(!bin){
+      // initialize structure if bin missing
+      bin = { members: membersFromDefault(), lastUpdated: null };
+    } else {
+      // ensure expected shape
+      if(!Array.isArray(bin.members)) bin.members = membersFromDefault();
+    }
+
+    // find member entry by name - if not found, add one
+    let m = bin.members.find(x => x.name === member);
+    if(!m){
+      // add new member entry
+      m = { id: bin.members.length + 1, name: member, availability: [] };
+      bin.members.push(m);
+    }
+    // replace availability
+    m.availability = activeEntries;
+
+    bin.lastUpdated = new Date().toISOString();
+
+    // write back
+    await putBin(bin);
+
+    // also mirror locally for offline fallback
+    localStorage.setItem('availability-'+member, JSON.stringify(activeEntries));
+
     exitEditMode();
-    showGradientViewFor(member);
-    alert('Saved.');
-  } catch(e){ console.error(e); alert('Save failed.'); }
-});
+    showGradientViewFor_memberData(member, bin);
+    alert('Saved to JSONBin.');
+  } catch (err) {
+    console.error('Save to bin failed:', err);
+    // fallback: try localStorage and inform user
+    try {
+      localStorage.setItem('availability-'+member, JSON.stringify(activeEntries));
+      exitEditMode();
+      showGradientViewFor_memberData(member, null);
+      alert('Save to JSONBin failed; saved locally instead.');
+    } catch(e){
+      alert('Save failed (remote and local). Check console for errors.');
+    }
+  } finally {
+    saveBtn.disabled = false;
+    saveBtn.textContent = 'Save';
+  }
+}
+
+saveBtn.addEventListener('click', saveBtnHandler);
 cancelBtn.addEventListener('click', ()=>{ exitEditMode(); });
 
-/* ================= INITIAL STATE ================= */
-showGradientViewFor('');
-if(isLoggedIn()) editBtn.style.display='inline-block';
+/* ================= LOAD & RENDER ON OPEN ================= */
+async function loadAndRenderCurrentMember(editMode){
+  const member = memberSelect.value;
+  // if BIN_ID provided, attempt to fetch bin, else use localStorage
+  let binData = null;
+  if(BIN_ID){
+    binData = await fetchBin().catch(()=>null);
+  }
+  if(editMode) loadEditModeFor_memberData(member, binData);
+  else showGradientViewFor_memberData(member, binData);
+}
+
+/* initial load: read remote (if available) and render gradient for empty selection */
+(async function initialLoad(){
+  let binData = null;
+  if(BIN_ID){
+    binData = await fetchBin().catch(()=>null);
+  }
+  // if bin exists but has members, and no selection, show combined gradient? We keep behavior: empty -> no gradient
+  showGradientViewFor_memberData('', binData);
+  if(isLoggedIn()) editBtn.style.display='inline-block';
+})();
+
 </script>
 </body>
 </html>
