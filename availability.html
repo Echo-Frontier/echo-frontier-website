@@ -391,15 +391,30 @@ function loadEditModeFor_memberData(member, bin) {
 
 /* ================= MODE TOGGLE ================= */
 function enterEditMode(){
-  if(isEditing) return;
-  const member = memberSelect.value;
-  if(!member){ alert('Select a member first'); return; }
+  if (isEditing) return;
 
-  isEditing=true;
-  editControls.style.display='flex';
-  editBtn.style.display='none';
-  [...gridEl.children].forEach(c=>{ c.classList.add('editable'); c.style.background=''; });
-  loadEditModeFor_memberData(member, binData);
+  // Enter editing state even if no member is selected yet
+  isEditing = true;
+  editControls.style.display = 'flex';
+  editBtn.style.display = 'none';
+
+  // Make grid editable visually — actual member data will load when selection changes
+  [...gridEl.children].forEach(c => {
+    c.classList.add('editable');
+    c.style.background = '';
+  });
+
+  // If a member is already selected, load its edit state immediately
+  const member = memberSelect.value;
+  if (member) {
+    loadEditModeFor_memberData(member, binData);
+  } else {
+    // No member selected yet — keep grid cleared and wait for user to choose one.
+    clearAllCells();
+  }
+
+  // Focus the member select so the user can pick quickly
+  memberSelect.focus();
 }
 function exitEditMode(){
   if(!isEditing) return;
