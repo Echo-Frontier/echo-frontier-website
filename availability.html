@@ -151,6 +151,8 @@ const loginSubmit = document.getElementById('loginSubmit');
 let isEditing = false;
 let isDragging = false;
 let dragState = null; // true = set active, false = unset
+let binData = null; // global, single source of truth
+
 
 /* ================= BUILD GRID ================= */
 function buildGrid() {
