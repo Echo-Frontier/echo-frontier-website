@@ -230,23 +230,28 @@ document.addEventListener('keydown', e => {
 
 /* ================= JSONBin API HELPERS ================= */
 async function fetchBin() {
-  if(!BIN_ID) return null;
-  // Try to fetch the latest version (public read works with /latest)
-  const url = `${JSONBIN_BASE}/${BIN_ID}/latest`;
-  try {
-    // If an API key is provided, include it for full access
-    const headers = {};
-    if (JSONBIN_API_KEY) headers['X-Master-Key'] = JSONBIN_API_KEY;
-    const resp = await fetch(url, { headers });
-    if (!resp.ok) throw new Error(`Fetch failed: ${resp.status}`);
-    const payload = await resp.json();
-    // JSONBin v3 wraps the stored JSON in `record`
-    return payload && payload.record ? payload.record : payload;
-  } catch (err) {
-    console.warn('Failed to fetch bin:', err);
-    return null;
+  if (!BIN_ID) return null;
+
+  const resp = await fetch(`https://api.jsonbin.io/v3/b/${BIN_ID}/latest`, {
+    headers: {
+      "X-Master-Key": JSONBIN_API_KEY
+    }
+  });
+
+  if (!resp.ok) {
+    throw new Error(`Fetch failed ${resp.status}`);
   }
+
+  const json = await resp.json();
+
+  // 🔑 CRITICAL: always return the RECORD only
+  if (json && typeof json === "object" && json.record) {
+    return json.record;
+  }
+
+  return null;
 }
+
 
 async function putBin(newData) {
   if(!BIN_ID) throw new Error('BIN_ID not set');
