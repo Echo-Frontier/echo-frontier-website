@@ -121,8 +121,8 @@ const ROWS = HOURS * INCREMENTS;
 const LOGIN_USER = 'EchoFrontier';
 const LOGIN_PASS = '3ch0Fr0ntier';
 
-/* JSONBin settings */
-const BIN_ID = "6971832743b1c97be94097bd";
+/* JSONBin config */
+const BIN_ID = "6971832743b1c97be94097bd"; 
 const JSONBIN_API_KEY = "$2a$10$edrLHMqxcyBUAdf6kSKuOeInAbA8ZzPVUdLe4pntkXe1BGw5RJCSe";
 const JSONBIN_BASE = "https://api.jsonbin.io/v3/b";
 
@@ -146,16 +146,18 @@ const loginSubmit = document.getElementById('loginSubmit');
 let isEditing = false;
 let isDragging = false;
 let dragState = null;
-let binData = null; // global single source of truth
+let binData = null;
 
 /* ================= BUILD GRID ================= */
 function buildGrid() {
+  // Days header
   days.forEach(d => {
     const div = document.createElement('div');
     div.textContent = d;
     daysHeaderEl.appendChild(div);
   });
 
+  // Time labels
   for (let h = 0; h < HOURS; h++) {
     for (let i = 0; i < INCREMENTS; i++) {
       const div = document.createElement('div');
@@ -166,22 +168,23 @@ function buildGrid() {
     }
   }
 
+  // Grid cells
   for (let r = 0; r < ROWS; r++) {
     for (let d = 0; d < 7; d++) {
       const cell = document.createElement('div');
       cell.className = 'availability-cell';
-      cell.dataset.index = (r * 7 + d).toString();
+      cell.dataset.index = (r*7 + d).toString();
 
+      // Drag to activate
       cell.addEventListener('mousedown', e => {
-        if (!isEditing || e.button !== 0) return;
+        if(!isEditing || e.button !== 0) return;
         e.preventDefault();
         isDragging = true;
         dragState = !cell.classList.contains('active');
         cell.classList.toggle('active', dragState);
       });
-
       cell.addEventListener('mouseenter', () => {
-        if (!isEditing || !isDragging) return;
+        if(!isEditing || !isDragging) return;
         cell.classList.toggle('active', dragState);
       });
 
@@ -195,65 +198,22 @@ buildGrid();
 
 /* ================= HELPERS ================= */
 function isLoggedIn(){ return localStorage.getItem('ef-auth')==='true'; }
-function clearAllCells() {
-  [...gridEl.children].forEach(c => { c.classList.remove('active'); c.style.background=''; });
-}
-function applyGradientOverlay() {
-  if(!binData || !Array.isArray(binData.members)) return;
+function clearAllCells(){ [...gridEl.children].forEach(c=>{ c.classList.remove('active'); c.style.background=''; }); }
 
-  clearAllCells();
-  const counts = {};
-  binData.members.forEach(member => {
-    member.availability.forEach(({day, hourUTC, minuteUTC}) => {
-      const temp = new Date();
-      temp.setUTCHours(hourUTC, minuteUTC, 0, 0);
-      const row = temp.getHours() * INCREMENTS + (temp.getMinutes() >= 30 ? 1 : 0);
-      const idx = row * 7 + (day % 7);
-      counts[idx] = (counts[idx] || 0) + 1;
-    });
-  });
-
-  const cells = [...gridEl.children];
-  Object.entries(counts).forEach(([idxStr, count]) => {
-    const idx = Number(idxStr);
-    const intensity = Math.min(count, 3) / 3;
-    const opacity = 0.2 + 0.6 * intensity;
-    if(cells[idx]) cells[idx].style.background = `rgba(106,166,255,${opacity})`;
-  });
+// Convert UTC availability to local grid index
+function utcToLocalIndex(hourUTC, minuteUTC, day) {
+  const d = new Date();
+  d.setUTCHours(hourUTC, minuteUTC, 0, 0);
+  const localHour = d.getHours();
+  const localMinute = d.getMinutes();
+  const row = localHour * INCREMENTS + (localMinute >= 30 ? 1 : 0);
+  const col = day % 7;
+  return row * 7 + col;
 }
 
-function loadMemberForEdit(memberName) {
-  clearAllCells();
-  if (!memberName || !binData || !Array.isArray(binData.members)) return;
-
-  const member = binData.members.find(m => m.name === memberName);
-  if (!member || !Array.isArray(member.availability)) return;
-
-  const cells = [...gridEl.children];
-  member.availability.forEach(({day, hourUTC, minuteUTC}) => {
-    const temp = new Date();
-    temp.setUTCHours(hourUTC, minuteUTC, 0, 0);
-    const row = temp.getHours() * INCREMENTS + (temp.getMinutes() >= 30 ? 1 : 0);
-    const idx = row * 7 + (day % 7);
-    if (cells[idx]) cells[idx].classList.add('active');
-  });
-}
-
-/* ================= LOGIN ================= */
-editBtn.addEventListener('click', () => {
-  if(isLoggedIn()) enterEditMode();
-  else { loginOverlay.style.display='flex'; loginUser.focus(); }
-});
-loginSubmit.addEventListener('click', () => {
-  if(loginUser.value.trim()===LOGIN_USER && loginPass.value===LOGIN_PASS){
-    localStorage.setItem('ef-auth','true'); loginOverlay.style.display='none'; enterEditMode();
-  } else alert('Invalid credentials');
-});
-document.addEventListener('keydown', e => { if(e.key==='Escape') loginOverlay.style.display='none'; });
-
-/* ================= JSONBin ================= */
+/* ================= JSONBIN ================= */
 async function fetchBin() {
-  if (!BIN_ID) return null;
+  if(!BIN_ID) return null;
   const headers = JSONBIN_API_KEY ? { "X-Master-Key": JSONBIN_API_KEY } : {};
   const resp = await fetch(`${JSONBIN_BASE}/${BIN_ID}/latest`, { headers });
   if(!resp.ok) throw new Error(`Fetch failed ${resp.status}`);
@@ -282,14 +242,63 @@ function membersFromDefault() {
   ];
 }
 
+// Populate dropdown
 function populateMemberSelect() {
-  memberSelect.innerHTML='';
+  memberSelect.innerHTML = '';
   const blank = document.createElement('option'); blank.value=''; blank.textContent='Select member';
   memberSelect.appendChild(blank);
-  (binData.members||membersFromDefault()).forEach(m=>{
-    const opt=document.createElement('option'); opt.value=m.name; opt.textContent=m.name; memberSelect.appendChild(opt);
+  (binData.members || membersFromDefault()).forEach(m=>{
+    const opt = document.createElement('option'); opt.value=m.name; opt.textContent=m.name;
+    memberSelect.appendChild(opt);
   });
 }
+
+/* ================= DISPLAY LOGIC ================= */
+function applyGradientOverlay() {
+  clearAllCells();
+  if(!binData || !Array.isArray(binData.members)) return;
+
+  const counts = {};
+  binData.members.forEach(member => {
+    if(!Array.isArray(member.availability)) return;
+    member.availability.forEach(({day, hourUTC, minuteUTC}) => {
+      const idx = utcToLocalIndex(hourUTC, minuteUTC, day);
+      counts[idx] = (counts[idx] || 0) + 1;
+    });
+  });
+
+  const cells = [...gridEl.children];
+  Object.entries(counts).forEach(([idxStr, count])=>{
+    const idx = Number(idxStr);
+    const intensity = Math.min(count, 3)/3;
+    const opacity = 0.2 + 0.6 * intensity;
+    if(cells[idx]) cells[idx].style.background = `rgba(106,166,255,${opacity})`;
+  });
+}
+
+function loadMemberForEdit(memberName){
+  clearAllCells();
+  if(!memberName || !binData || !Array.isArray(binData.members)) return;
+  const member = binData.members.find(m => m.name === memberName);
+  if(!member || !Array.isArray(member.availability)) return;
+  const cells = [...gridEl.children];
+  member.availability.forEach(({day,hourUTC,minuteUTC})=>{
+    const idx = utcToLocalIndex(hourUTC, minuteUTC, day);
+    if(cells[idx]) cells[idx].classList.add('active');
+  });
+}
+
+/* ================= LOGIN ================= */
+editBtn.addEventListener('click', ()=>{
+  if(isLoggedIn()) enterEditMode();
+  else { loginOverlay.style.display='flex'; loginUser.focus(); }
+});
+loginSubmit.addEventListener('click', ()=>{
+  if(loginUser.value.trim()===LOGIN_USER && loginPass.value===LOGIN_PASS){
+    localStorage.setItem('ef-auth','true'); loginOverlay.style.display='none'; enterEditMode();
+  } else alert('Invalid credentials');
+});
+document.addEventListener('keydown', e => { if(e.key==='Escape') loginOverlay.style.display='none'; });
 
 /* ================= EDIT MODE ================= */
 function enterEditMode() {
@@ -298,7 +307,7 @@ function enterEditMode() {
   editControls.style.display='flex';
   editBtn.style.display='none';
   [...gridEl.children].forEach(c=>{ c.classList.add('editable'); c.style.background=''; });
-  clearAllCells(); // start blank for edit
+  clearAllCells();
   memberSelect.focus();
 }
 function exitEditMode() {
@@ -307,18 +316,18 @@ function exitEditMode() {
   editControls.style.display='none';
   editBtn.style.display='inline-block';
   [...gridEl.children].forEach(c=>{ c.classList.remove('editable'); c.classList.remove('active'); c.style.background=''; });
-  applyGradientOverlay(); // show combined view
+  applyGradientOverlay();
 }
 
 /* ================= EVENT HANDLERS ================= */
-memberSelect.addEventListener('change', ()=> {
-  if (!binData) return; // prevent running before bin is loaded
+memberSelect.addEventListener('change', ()=>{
+  if(!binData) return;
   if(isEditing) loadMemberForEdit(memberSelect.value);
   else applyGradientOverlay();
 });
 
 /* ================= SAVE ================= */
-async function saveBtnHandler() {
+async function saveBtnHandler(){
   const memberName = memberSelect.value;
   if(!memberName){ alert('Select a member before saving'); return; }
 
@@ -330,7 +339,6 @@ async function saveBtnHandler() {
     const localHour=Math.floor(row/INCREMENTS); const localMinute=(row%INCREMENTS)*30;
     const temp = new Date(); temp.setHours(localHour,localMinute,0,0);
     const hourUTC = temp.getUTCHours(); const minuteUTC=temp.getUTCMinutes();
-    // avoid duplicates
     if(!newAvailability.find(e=>e.day===day && e.hourUTC===hourUTC && e.minuteUTC===minuteUTC))
       newAvailability.push({day,hourUTC,minuteUTC});
   });
@@ -358,12 +366,13 @@ async function saveBtnHandler() {
 async function initialLoad(){
   try{
     binData = await fetchBin();
-    if(!binData || !Array.isArray(binData.members)) binData={members:membersFromDefault(),lastUpdated:null};
-  } catch(e){ console.warn('Fetch failed, using defaults',e); binData={members:membersFromDefault(),lastUpdated:null}; }
+    if(!binData || !Array.isArray(binData.members)) binData = {members:membersFromDefault(),lastUpdated:null};
+  } catch(e){ console.warn('Fetch failed, using defaults', e); binData={members:membersFromDefault(),lastUpdated:null}; }
   populateMemberSelect();
   applyGradientOverlay();
   if(isLoggedIn()) editBtn.style.display='inline-block';
 }
+
 saveBtn.addEventListener('click', saveBtnHandler);
 cancelBtn.addEventListener('click', exitEditMode);
 initialLoad();
