@@ -267,6 +267,26 @@ async function putBin(newData) {
   }
   const payload = await resp.json().catch(()=>null);
   return payload;
+}async function putBin(newData) {
+  const url = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+
+  const resp = await fetch(url, {
+    method: "PUT",
+    headers: {
+      "Content-Type": "application/json",
+      "X-Master-Key": JSONBIN_API_KEY
+    },
+    body: JSON.stringify({
+      record: newData
+    })
+  });
+
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`JSONBin PUT failed ${resp.status}: ${text}`);
+  }
+
+  return resp.json();
 }
 
 /* ================= LOADING / DISPLAY LOGIC ================= */
