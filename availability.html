@@ -346,30 +346,39 @@ function loadSavedToMap_local(member){
   try{ const saved = JSON.parse(raw); return saved.reduce((acc,e)=>{ const temp = new Date(); temp.setUTCHours(e.hourUTC,e.minuteUTC,0,0); const row = temp.getHours()*INCREMENTS + (temp.getMinutes()>=30?1:0); const idx = row*7 + (e.day%7); acc[idx]=(acc[idx]||0)+1; return acc; }, {}); } catch { return {}; }
 }
 
-function showGradientViewFor_memberData(member, membersData) {
+function showGradientViewFor_memberData(member, binData) {
   clearAllCells();
+
   let counts = {};
-  if (membersData) counts = availabilityMapFromMembers(membersData, member);
-  // fallback to localStorage if no remote
-  if (Object.keys(counts).length === 0) counts = loadSavedToMap_local(member);
-  const cells=[...gridEl.children];
-  Object.entries(counts).forEach(([idxStr,count])=>{
-    const idx=Number(idxStr);
-    const intensity=Math.min(count,3)/3;
-    const opacity=0.2 + 0.6*intensity;
-    if(cells[idx]) cells[idx].style.background=`rgba(106,166,255,${opacity})`;
+  if (binData) {
+    counts = availabilityMapFromMembers(binData, member);
+  }
+
+  const cells = [...gridEl.children];
+  Object.entries(counts).forEach(([idxStr, count]) => {
+    const idx = Number(idxStr);
+    const intensity = Math.min(count, 3) / 3;
+    const opacity = 0.2 + 0.6 * intensity;
+    if (cells[idx]) {
+      cells[idx].style.background = `rgba(106,166,255,${opacity})`;
+    }
   });
 }
 
-function loadEditModeFor_memberData(member, membersData){
+function loadEditModeFor_memberData(member, binData) {
   clearAllCells();
+
   let counts = {};
-  if (membersData) counts = availabilityMapFromMembers(membersData, member);
-  if (Object.keys(counts).length === 0) counts = loadSavedToMap_local(member);
-  const cells=[...gridEl.children];
-  Object.entries(counts).forEach(([idxStr,count])=>{
-    const idx=Number(idxStr);
-    if(cells[idx]) cells[idx].classList.add('active');
+  if (binData) {
+    counts = availabilityMapFromMembers(binData, member);
+  }
+
+  const cells = [...gridEl.children];
+  Object.entries(counts).forEach(([idxStr]) => {
+    const idx = Number(idxStr);
+    if (cells[idx]) {
+      cells[idx].classList.add('active');
+    }
   });
 }
 
