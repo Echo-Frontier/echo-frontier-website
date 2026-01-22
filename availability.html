@@ -224,10 +224,10 @@ function applyGradientOverlay() {
 
 function loadMemberForEdit(memberName) {
   clearAllCells();
-  if(!memberName) return;
+  if (!memberName || !binData || !Array.isArray(binData.members)) return;
 
   const member = binData.members.find(m => m.name === memberName);
-  if(!member || !Array.isArray(member.availability)) return;
+  if (!member || !Array.isArray(member.availability)) return;
 
   const cells = [...gridEl.children];
   member.availability.forEach(({day, hourUTC, minuteUTC}) => {
@@ -235,7 +235,7 @@ function loadMemberForEdit(memberName) {
     temp.setUTCHours(hourUTC, minuteUTC, 0, 0);
     const row = temp.getHours() * INCREMENTS + (temp.getMinutes() >= 30 ? 1 : 0);
     const idx = row * 7 + (day % 7);
-    if(cells[idx]) cells[idx].classList.add('active');
+    if (cells[idx]) cells[idx].classList.add('active');
   });
 }
 
@@ -312,6 +312,7 @@ function exitEditMode() {
 
 /* ================= EVENT HANDLERS ================= */
 memberSelect.addEventListener('change', ()=> {
+  if (!binData) return; // prevent running before bin is loaded
   if(isEditing) loadMemberForEdit(memberSelect.value);
   else applyGradientOverlay();
 });
