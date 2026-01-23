@@ -328,7 +328,11 @@ function applyGradientOverlay() {
     if (!Number.isFinite(idx) || idx < 0 || idx >= cells.length) return;
     const intensity = Math.min(count, 5) / 5;
     const opacity = 0.2 + 0.8 * intensity
-    cells[idx].style.background = `rgba(106,166,255,${opacity})`;
+    if (count = 5) {
+      cells[idx].style.background = `rgba(26,0,255,${opacity})`;
+    } else {
+      cells[idx].style.background = `rgba(106,166,255,${opacity})`;
+    }
   });
 }
 
