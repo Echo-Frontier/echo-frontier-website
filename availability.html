@@ -486,6 +486,58 @@ initialLoad();
 
 </script>
 
+  <script>
+/* ================= AVAILABILITY POPUP ================= */
+const popup = document.createElement('div');
+popup.style.position = 'absolute';
+popup.style.background = '#151520';
+popup.style.color = '#e6e6eb';
+popup.style.padding = '8px 12px';
+popup.style.borderRadius = '6px';
+popup.style.boxShadow = '0 4px 16px rgba(0,0,0,0.6)';
+popup.style.pointerEvents = 'none';
+popup.style.zIndex = '9999';
+popup.style.display = 'none';
+document.body.appendChild(popup);
+
+function getMembersAtCell(index) {
+  if (!binData || !Array.isArray(binData.members)) return [];
+  const row = Math.floor(index / 7);
+  const col = index % 7;
+
+  const availableMembers = [];
+  binData.members.forEach(member => {
+    if (!Array.isArray(member.availability)) return;
+    const isAvailable = member.availability.some(({ day, hourUTC, minuteUTC }) => {
+      return utcToLocalIndex(hourUTC, minuteUTC, day) === index;
+    });
+    if (isAvailable) availableMembers.push(member.name);
+  });
+  return availableMembers;
+}
+
+gridEl.addEventListener('click', (e) => {
+  if (isEditing) return; // only in availability mode
+  const cell = e.target.closest('.availability-cell');
+  if (!cell) return;
+  const idx = Number(cell.dataset.index);
+  const membersHere = getMembersAtCell(idx);
+  if (!membersHere.length) return;
+
+  popup.textContent = membersHere.join(', ');
+  popup.style.display = 'block';
+  const rect = cell.getBoundingClientRect();
+  popup.style.top = (window.scrollY + rect.top - popup.offsetHeight - 6) + 'px';
+  popup.style.left = (window.scrollX + rect.left + rect.width / 2 - popup.offsetWidth / 2) + 'px';
+});
+
+// hide popup on click elsewhere or scroll
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('.availability-cell')) popup.style.display = 'none';
+});
+document.addEventListener('scroll', () => { popup.style.display = 'none'; });
+window.addEventListener('resize', () => { popup.style.display = 'none'; });
+</script>
 
 </body>
 </html>
