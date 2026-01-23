@@ -5,12 +5,9 @@
   <title>Contact - Echo Frontier</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
 
-  <!-- Force reload of stylesheet if cached; you can remove ?v=2 later. -->
   <link rel="stylesheet" href="styles.css?v=2">
 
-  <!-- CRITICAL INLINE STYLES (ensures the contact card looks correct even if external CSS is cached/overridden) -->
   <style>
-    /* Critical contact-card styles - placed inline to guarantee they apply first */
     :root {
       --bg-card: #151520;
       --bg-card-2: #18181c;
@@ -25,11 +22,8 @@
 
     main { max-width: 1100px; margin: 40px auto; padding: 0 24px; }
     h2 { font-size: 2rem; margin-bottom: 16px; text-align: center; color: var(--text); }
-
-    /* Ensure nav looks correct (minimal) */
     nav a.active { color: var(--accent); background: rgba(106,166,255,0.06); }
 
-    /* HIGH-SPECIFICITY contact card to override UA/default styles */
     main .contact-card, main .contact-card * { box-sizing: border-box; -webkit-font-smoothing:antialiased; }
 
     main .contact-card {
@@ -43,7 +37,6 @@
       color: var(--text) !important;
     }
 
-    /* Kill browser default input styling, then reapply exactly what we want */
     main .contact-card form.contact-form input,
     main .contact-card form.contact-form textarea,
     main .contact-card form.contact-form select {
@@ -71,8 +64,6 @@
       margin-right: auto;
     }
 
-
-    /* Ensure placeholder color */
     main .contact-card form.contact-form input::placeholder,
     main .contact-card form.contact-form textarea::placeholder,
     main .contact-card form.contact-form select::placeholder {
@@ -80,7 +71,6 @@
       opacity: 1;
     }
 
-    /* Focus state */
     main .contact-card form.contact-form input:focus,
     main .contact-card form.contact-form textarea:focus,
     main .contact-card form.contact-form select:focus {
@@ -90,14 +80,12 @@
       background: var(--bg-card-2) !important;
     }
 
-    /* Disable the textarea from resizing horizontally/affecting other boxes */
     main .contact-card form.contact-form textarea {
       min-height: 140px;
-      resize: none !important; /* prevents layout shifts */
+      resize: none !important;
       overflow: auto;
     }
 
-    /* Submit button: neutralize UA, then style */
     main .contact-card form.contact-form button[type="submit"] {
       all: unset;
       display: inline-block;
@@ -122,14 +110,15 @@
       transform: translateY(0);
     }
 
-    /* small helper text */
-    main .contact-card .form-note { font-size: 0.9rem; color: var(--muted); margin-top: 6px; }
+    main .contact-card .form-note { font-size: 0.95rem; color: var(--muted); margin-top: 12px; text-align:center; }
 
-    /* mobile */
     @media (max-width:640px){
       main { margin: 24px auto; padding: 0 16px; }
       main .contact-card { padding: 18px; max-width: 92%; margin-bottom: 32px; }
     }
+
+    /* Honeypot field hidden */
+    .hp { position: absolute; left: -9999px; top: auto; width: 1px; height: 1px; overflow: hidden; }
   </style>
 </head>
 <body>
@@ -157,8 +146,8 @@
       <div class="hint" style="color:#8f98b3;font-size:0.85rem;">We typically reply in a few business days</div>
     </div>
 
-    <!-- Replace the action URL with your Formspree endpoint -->
-    <form class="contact-form" action="https://formspree.io/f/xxxxx" method="POST" novalidate>
+    <!-- Formspree endpoint set to the provided endpoint -->
+    <form class="contact-form" action="https://formspree.io/f/xkojoawp" method="POST" novalidate>
       <input type="text" name="name" placeholder="Your name" aria-label="Name" required>
       <input type="email" name="email" placeholder="Your email" aria-label="Email" required>
 
@@ -172,7 +161,12 @@
 
       <textarea name="message" placeholder="Your message" aria-label="Message" required></textarea>
 
-      <div class="form-note" id="form-note" aria-live="polite" style="display:none;"></div>
+      <!-- Honeypot anti-spam field (hidden) -->
+      <div class="hp" aria-hidden="true">
+        <label>Leave this empty<input name="_gotcha" tabindex="-1" autocomplete="off"></label>
+      </div>
+
+      <div class="form-note" id="form-note" aria-live="polite" style="display:block;"></div>
 
       <button type="submit">Send</button>
     </form>
@@ -180,15 +174,93 @@
 </main>
 
 <script>
-  // show friendly note if ?success=1 is present
-  (function(){
-    const url = new URL(window.location.href);
-    const noteEl = document.getElementById('form-note');
-    if (url.searchParams.get('success') === '1') {
-      noteEl.textContent = 'Thanks — your message was sent.';
-      noteEl.style.display = 'block';
+(function () {
+  const form = document.querySelector('.contact-form');
+  const noteEl = document.getElementById('form-note');
+  const submitBtn = form.querySelector('button[type="submit"]');
+
+  // Helper to show messages
+  function showMessage(text, opts = {}) {
+    noteEl.textContent = text;
+    noteEl.style.color = opts.positive ? '#9be7a6' : '#f7a6a6';
+  }
+
+  // If URL contains ?success=1 (legacy), show message
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('success') === '1') {
+    showMessage('Thanks — your message was sent.', { positive: true });
+  } else {
+    noteEl.textContent = '';
+  }
+
+  // Prevent double submissions
+  function setSubmitting(isSubmitting) {
+    submitBtn.disabled = isSubmitting;
+    submitBtn.textContent = isSubmitting ? 'Sending…' : 'Send';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    // If JS is disabled this won't run and the native form action will submit to Formspree
+    e.preventDefault();
+
+    // Basic validation
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
     }
-  })();
+
+    // Honeypot
+    if (form._gotcha && form._gotcha.value) {
+      // silently treat as success (to confuse bots)
+      showMessage('Thanks — your message was sent.', { positive: true });
+      return;
+    }
+
+    const payload = {
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      reason: form.reason.value || '',
+      message: form.message.value.trim(),
+      _replyto: form.email.value.trim()
+    };
+
+    setSubmitting(true);
+    showMessage('Sending…');
+
+    try {
+      const resp = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (resp.ok) {
+        // Formspree returns 200/201 and a json with message
+        showMessage('Thanks — your message was sent.', { positive: true });
+        form.reset();
+      } else {
+        let json;
+        try { json = await resp.json(); } catch(_) { json = null; }
+        // If Formspree returns validation errors, present them
+        if (json && json.errors && json.errors.length) {
+          showMessage(json.errors.map(x => x.message).join('; '));
+        } else {
+          showMessage('Failed to send message. Please try again later or use your email client.');
+        }
+      }
+    } catch (err) {
+      console.error('Contact form send error', err);
+      showMessage('Network error — check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+      // keep message visible
+    }
+  });
+
+})();
 </script>
 
 </body>
