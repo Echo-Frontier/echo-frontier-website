@@ -326,7 +326,7 @@ function applyGradientOverlay() {
   Object.entries(counts).forEach(([idxStr, count]) => {
     const idx = Number(idxStr);
     if (!Number.isFinite(idx) || idx < 0 || idx >= cells.length) return;
-    const intensity = Math.min(count, 3) / 3;
+    const intensity = Math.min(count, 5) / 5;
     const opacity = 0.22 + 0.6 * intensity;
     cells[idx].style.background = `rgba(106,166,255,${opacity})`;
   });
