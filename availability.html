@@ -327,7 +327,7 @@ function applyGradientOverlay() {
     const idx = Number(idxStr);
     if (!Number.isFinite(idx) || idx < 0 || idx >= cells.length) return;
     const intensity = Math.min(count, 5) / 5;
-    const opacity = 0.2 + 0.8 * intensity;
+    const opacity = (intensity * intensity) / 25
     cells[idx].style.background = `rgba(106,166,255,${opacity})`;
   });
 }
