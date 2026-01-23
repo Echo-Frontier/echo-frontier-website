@@ -539,5 +539,40 @@ document.addEventListener('scroll', () => { popup.style.display = 'none'; });
 window.addEventListener('resize', () => { popup.style.display = 'none'; });
 </script>
 
+<script>
+/* ================= DAILY UTC LOGOUT SCRIPT ================= */
+(function() {
+  /**
+   * Logs the user out daily at 12:00 AM UTC
+   * by removing the ef-auth key from localStorage.
+   */
+  function scheduleDailyLogout() {
+    const now = new Date();
+    const nextUTCmidnight = new Date(Date.UTC(
+      now.getUTCFullYear(),
+      now.getUTCMonth(),
+      now.getUTCDate() + 1, // tomorrow
+      0, 0, 0, 0 // 00:00:00 UTC
+    ));
+
+    const msUntilNext = nextUTCmidnight - now;
+
+    setTimeout(() => {
+      // Log out user
+      localStorage.removeItem('ef-auth');
+
+      // Optional: silently reload page to enforce logout
+      // location.reload();
+
+      // Reschedule for the following day
+      scheduleDailyLogout();
+    }, msUntilNext);
+  }
+
+  // Initialize on page load
+  scheduleDailyLogout();
+})();
+</script>
+
 </body>
 </html>
