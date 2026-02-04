@@ -40,7 +40,7 @@
 </footer>
 
 <script>
-  fetch('./data/projects.json')
+  fetch('https://website-backend-k7zl.onrender.com/data/projects.json')
     .then(res => {
       if (!res.ok) throw new Error("Could not load JSON file");
       return res.json();
