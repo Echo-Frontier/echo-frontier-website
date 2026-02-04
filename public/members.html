@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Echo Frontier | Home</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+<div class="utility-bar">
+    <button class="member-login-btn" onclick="location.href='login.html'">
+        <i class="fa-solid fa-circle-user"></i> Member Dashboard
+    </button>
+</div>
+
+<header>
+  <div class="header-title">
+    <img src="icon.png" alt="Studio Icon">
+    <h1>Echo Frontier</h1>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Home</a>
+  <a href="projects.html">Projects</a>
+  <a href="members.html" class="active">Members</a>
+  <a href="contact.html">Contact</a>
+</nav>
+
+<main>
+  <h2>The Team</h2>
+  <div class="members-grid" id="members-grid">
+    </div>
+</main>
+
+<footer>
+    <p>&copy; 2026 Echo Frontier Studio. Powered by Socket.io Engine.</p>
+</footer>
+
+<script>
+  const jsonPath = './data/team.json';
+
+  fetch(jsonPath)
+    .then(response => {
+      if (!response.ok) throw new Error('Failed to fetch team.json: ' + response.status);
+      return response.json();
+    })
+    .then(team => {
+      const container = document.getElementById('members-grid');
+      container.innerHTML = '';
+
+      team.forEach(member => {
+        const card = document.createElement('div');
+        card.className = 'member-card';
+
+        // Check for placeholder if image is missing
+        const avatarSrc = member.avatar || 'https://via.placeholder.com/150';
+
+        card.innerHTML = `
+          <img src="${avatarSrc}" alt="${member.name}">
+          <div class="member-name">${member.name}</div>
+          <div class="member-title">${member.title}</div>
+        `;
+
+        container.appendChild(card);
+      });
+    })
+    .catch(err => {
+      const container = document.getElementById('members-grid');
+      container.innerHTML = '<p style="text-align:center;">Failed to load team members. Ensure team.json exists in /public/data/.</p>';
+      console.error(err);
+    });
+</script>
+
+</body>
+</html>

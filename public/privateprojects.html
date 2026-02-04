@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Admin: Projects | Echo Frontier</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+  <script>
+    if (!localStorage.getItem('frontier_token')) window.location.href = 'login.html';
+  </script>
+</head>
+<body>
+
+<header>
+  <div class="header-title">
+    <img src="icon.png" alt="Studio Icon">
+    <h1>Echo Frontier <span style="color: #6aa6ff; font-size: 0.8rem;">(Admin)</span></h1>
+  </div>
+</header>
+
+<nav>
+  <a href="private.html">Home</a>
+  <a href="privateprojects.html" class="active">Projects</a>
+  <a href="privatemembers.html">Members</a>
+  <a href="privateprogress.html">Progress</a>
+  <a href="privateavailability.html">Availability</a>
+  <a href="index.html" onclick="logout()" style="color: #f7a6a6;">Logout</a>
+</nav>
+
+<main>
+  <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+    <h2>Project Management</h2>
+    <button class="edit-btn" onclick="openAddModal()">+ New Project</button>
+  </div>
+  
+  <div id="projects-list" class="admin-list-container">
+    </div>
+</main>
+
+<div id="project-modal" class="modal-overlay">
+  <div class="modal-card" style="max-width: 500px;">
+    <h3 id="modal-title">Edit Project</h3>
+    <form id="project-form">
+      <input type="hidden" id="proj-index">
+      
+      <label>Project Title</label>
+      <input type="text" id="proj-title" required>
+      
+      <label>Description</label>
+      <textarea id="proj-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;"></textarea>
+      
+      <label>Showcase Images (Max 3 paths)</label>
+      <input type="text" id="proj-img1" placeholder="Image 1 Path">
+      <input type="text" id="proj-img2" placeholder="Image 2 Path" style="margin-top:5px;">
+      <input type="text" id="proj-img3" placeholder="Image 3 Path" style="margin-top:5px;">
+      
+      <div class="modal-actions">
+        <button type="button" onclick="closeModal()" class="cancel-btn">Cancel</button>
+        <button type="submit" class="save-btn">Save Project</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<script>
+  const jsonPath = './data/projects.json';
+  const socket = io("https://website-backend-k7zl.onrender.com");
+  let allProjects = [];
+
+  function renderProjects() {
+    const container = document.getElementById('projects-list');
+    container.innerHTML = '';
+
+    allProjects.forEach((proj, index) => {
+      const card = document.createElement('div');
+      card.className = 'admin-wide-card';
+      
+      // Preview images display
+      const images = proj.images || [];
+      let imgHTML = images.map(src => `<img src="${src}" class="mini-preview">`).join('');
+
+      card.innerHTML = `
+        <div class="proj-info">
+          <h3>${proj.title}</h3>
+          <p>${proj.description || 'No description'}</p>
+          <div class="preview-strip">${imgHTML}</div>
+        </div>
+        <div class="proj-actions">
+          <button class="edit-btn" onclick="openEditModal(${index})"><i class="fa-solid fa-pen"></i> Edit</button>
+        </div>
+      `;
+      container.appendChild(card);
+    });
+  }
+
+  fetch(jsonPath).then(res => res.json()).then(data => {
+    allProjects = data;
+    renderProjects();
+  });
+
+  function openEditModal(index) {
+    const p = allProjects[index];
+    document.getElementById('modal-title').innerText = "Edit Project";
+    document.getElementById('proj-index').value = index;
+    document.getElementById('proj-title').value = p.title;
+    document.getElementById('proj-desc').value = p.description || '';
+    document.getElementById('proj-img1').value = p.images?.[0] || '';
+    document.getElementById('proj-img2').value = p.images?.[1] || '';
+    document.getElementById('proj-img3').value = p.images?.[2] || '';
+    document.getElementById('project-modal').style.display = 'flex';
+  }
+
+  function openAddModal() {
+    document.getElementById('modal-title').innerText = "New Project";
+    document.getElementById('proj-index').value = "new";
+    document.getElementById('project-form').reset();
+    document.getElementById('project-modal').style.display = 'flex';
+  }
+
+  function closeModal() { document.getElementById('project-modal').style.display = 'none'; }
+
+  document.getElementById('project-form').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const idx = document.getElementById('proj-index').value;
+    
+    const projectData = {
+      title: document.getElementById('proj-title').value,
+      description: document.getElementById('proj-desc').value,
+      images: [
+        document.getElementById('proj-img1').value,
+        document.getElementById('proj-img2').value,
+        document.getElementById('proj-img3').value
+      ].filter(path => path !== "") // Remove empty slots
+    };
+
+    if (idx === "new") allProjects.push(projectData);
+    else allProjects[parseInt(idx)] = projectData;
+
+    socket.emit('update-projects-file', allProjects);
+    renderProjects();
+    closeModal();
+  });
+
+  function logout() { localStorage.removeItem('frontier_token'); window.location.href = 'login.html'; }
+</script>
+</body>
+</html>

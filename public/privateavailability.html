@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Availability | Echo Frontier Admin</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        if (!localStorage.getItem('frontier_token')) window.location.href = 'login.html';
+    </script>
+    <style>
+        .grid-wrapper { display: grid; grid-template-columns: 80px 1fr; gap: 10px; overflow-x: auto; background: #151520; padding: 20px; border-radius: 12px; border: 1px solid #2a2a3a; }
+        .days-header { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 10px; }
+        .days-header div { text-align: center; color: #6aa6ff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase; }
+        .time-labels { display: flex; flex-direction: column; gap: 0; margin-top: 28px; }
+        .time-labels div { height: 22px; line-height: 22px; font-size: 0.65rem; color: #8f98b3; text-align: right; padding-right: 10px; }
+        .availability-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; width: 100%; }
+        .availability-cell { width: 100%; height: 20px; background: #1f1f2a; border-radius: 2px; transition: background 0.1s; border: 1px solid rgba(255,255,255,0.02); }
+        .availability-cell.editable { cursor: crosshair; }
+        .availability-cell.editable:hover { border-color: #6aa6ff; }
+        .availability-cell.active { background: #6aa6ff !important; box-shadow: inset 0 0 8px rgba(0,0,0,0.3); }
+        .edit-controls { display: flex; align-items: center; gap: 12px; background: #1f1f2a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2a3a; }
+        select { background: #0b0b10; color: white; border: 1px solid #333345; padding: 8px; border-radius: 6px; outline: none; }
+        .status-popup { position: absolute; background: #6aa6ff; color: #061025; padding: 5px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; pointer-events: none; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-title">
+        <img src="icon.png" alt="Icon">
+        <h1>Echo Frontier <span style="color: #6aa6ff; font-size: 0.8rem;">(Admin)</span></h1>
+    </div>
+</header>
+
+<nav>
+    <a href="private.html">Home</a>
+    <a href="privateprojects.html">Projects</a>
+    <a href="privatemembers.html">Members</a>
+    <a href="privateprogress.html">Progress</a>
+    <a href="privateavailability.html" class="active">Availability</a>
+    <a href="index.html" onclick="logout()" style="color: #f7a6a6;">Logout</a>
+</nav>
+
+<main>
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+        <h2>Team Availability</h2>
+        <button id="editBtn" class="edit-btn" style="width: auto; padding: 10px 25px;">Enter Edit Mode</button>
+    </div>
+
+    <div class="edit-controls" id="editControls" style="display:none;">
+        <label>Account:</label>
+        <select id="memberSelect"></select>
+        <button id="saveBtn" class="save-btn" style="padding: 8px 20px;">Save Changes</button>
+        <button id="cancelBtn" class="cancel-btn" style="padding: 8px 20px;">Cancel</button>
+    </div>
+
+    <div class="grid-wrapper">
+        <div class="time-labels" id="timeLabels"></div>
+        <div>
+            <div class="days-header" id="daysHeader"></div>
+            <div class="availability-grid" id="availabilityGrid"></div>
+        </div>
+    </div>
+</main>
+
+<script>
+    const socket = io("https://website-backend-k7zl.onrender.com");
+    const days = ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"];
+    const ROWS = 48; 
+    
+    let isEditing = false, isDragging = false, dragState = null, binData = { members: [] };
+
+    /* --- Auth: Get User from JWT --- */
+    function getLoggedInUser() {
+        const token = localStorage.getItem('frontier_token');
+        if (!token) return null;
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            const user = JSON.parse(jsonPayload).username;
+            console.log("Logged in as:", user);
+            return user;
+        } catch (e) { return null; }
+    }
+
+    /* --- UI --- */
+    function buildGrid() {
+        days.forEach(d => {
+            const div = document.createElement('div');
+            div.textContent = d;
+            document.getElementById('daysHeader').appendChild(div);
+        });
+        for (let h = 0; h < 24; h++) {
+            for (let i = 0; i < 2; i++) {
+                const div = document.createElement('div');
+                div.textContent = `${h.toString().padStart(2, '0')}:${i === 0 ? '00' : '30'}`;
+                document.getElementById('timeLabels').appendChild(div);
+            }
+        }
+        const grid = document.getElementById('availabilityGrid');
+        for (let i = 0; i < ROWS * 7; i++) {
+            const cell = document.createElement('div');
+            cell.className = 'availability-cell';
+            cell.dataset.index = i;
+            cell.addEventListener('mousedown', e => {
+                if (!isEditing) return;
+                isDragging = true;
+                dragState = !cell.classList.contains('active');
+                cell.classList.toggle('active', dragState);
+            });
+            cell.addEventListener('mouseenter', () => {
+                if (isEditing && isDragging) cell.classList.toggle('active', dragState);
+            });
+            grid.appendChild(cell);
+        }
+    }
+
+    /* --- Time Conversion (UTC Stable) --- */
+    function getUTC(index) {
+        const row = Math.floor(index / 7), col = index % 7;
+        const h = Math.floor(row / 2), m = (row % 2) * 30;
+        const localDate = new Date(1970, 0, 4 + col, h, m, 0);
+        return { day: localDate.getUTCDay(), h: localDate.getUTCHours(), m: localDate.getUTCMinutes() };
+    }
+
+    function getLocalIndex(hUTC, mUTC, dUTC) {
+        const utcDate = new Date(Date.UTC(1970, 0, 4, hUTC, mUTC, 0));
+        const dayOffset = (dUTC - utcDate.getUTCDay() + 7) % 7;
+        utcDate.setUTCDate(utcDate.getUTCDate() + dayOffset);
+        const row = (utcDate.getHours() * 2) + (utcDate.getMinutes() >= 30 ? 1 : 0);
+        return (row * 7) + utcDate.getDay();
+    }
+
+    /* --- Team Loading & Security Lock --- */
+    function loadTeamAndLock() {
+        const currentUser = getLoggedInUser();
+        const normalizedUser = currentUser ? currentUser.trim().toLowerCase() : null;
+
+        fetch('./data/team.json').then(res => res.json()).then(team => {
+            const select = document.getElementById('memberSelect');
+            select.innerHTML = '';
+            
+            let userFound = false;
+            team.forEach(m => {
+                const opt = document.createElement('option');
+                opt.value = m.name; opt.textContent = m.name;
+                
+                const normalizedMember = m.name.trim().toLowerCase();
+
+                if (normalizedMember !== normalizedUser) {
+                    opt.disabled = true;
+                } else {
+                    opt.selected = true; 
+                    userFound = true;
+                }
+                select.appendChild(opt);
+            });
+
+            if (!userFound) {
+                document.getElementById('editBtn').style.display = 'none';
+                console.error(`Security: "${currentUser}" not found in team.json. Access denied.`);
+            }
+        });
+    }
+
+    socket.emit('get-availability');
+    socket.on('load-availability', data => { binData = data || { members: [] }; applyHeatmap(); });
+
+    function applyHeatmap() {
+        if (isEditing) return;
+        const cells = document.querySelectorAll('.availability-cell');
+        cells.forEach(c => { c.style.background = '#1f1f2a'; c.classList.remove('active'); });
+
+        if (!binData.members.length) return;
+        const counts = {}; let max = 0;
+        binData.members.forEach(m => {
+            m.availability.forEach(slot => {
+                const idx = getLocalIndex(slot.h, slot.m, slot.day);
+                counts[idx] = (counts[idx] || 0) + 1;
+                if (counts[idx] > max) max = counts[idx];
+            });
+        });
+        Object.keys(counts).forEach(idx => {
+            const intensity = counts[idx] / max;
+            const opacity = 0.15 + (intensity * 0.85);
+            if (cells[idx]) cells[idx].style.background = `rgba(106, 166, 255, ${opacity})`;
+        });
+    }
+
+    /* --- Handlers --- */
+    document.getElementById('editBtn').onclick = () => {
+        const select = document.getElementById('memberSelect');
+        const currentUser = getLoggedInUser();
+        
+        // Strict case-insensitive check
+        if (select.value.trim().toLowerCase() !== currentUser.trim().toLowerCase()) {
+            return alert("Security: You can only edit your own availability.");
+        }
+
+        isEditing = true;
+        document.getElementById('editControls').style.display = 'flex';
+        document.getElementById('editBtn').style.display = 'none';
+        select.style.pointerEvents = 'none'; // Lock choice
+        
+        document.querySelectorAll('.availability-cell').forEach(c => {
+            c.classList.add('editable');
+            c.style.background = '';
+        });
+        select.dispatchEvent(new Event('change'));
+    };
+
+    document.getElementById('memberSelect').onchange = (e) => {
+        document.querySelectorAll('.availability-cell').forEach(c => c.classList.remove('active'));
+        const member = binData.members.find(m => m.name === e.target.value);
+        if (member) {
+            member.availability.forEach(slot => {
+                const idx = getLocalIndex(slot.h, slot.m, slot.day);
+                const cell = document.querySelector(`[data-index="${idx}"]`);
+                if (cell) cell.classList.add('active');
+            });
+        }
+    };
+
+    document.getElementById('saveBtn').onclick = () => {
+        const name = document.getElementById('memberSelect').value;
+        const activeSlots = [];
+        document.querySelectorAll('.availability-cell.active').forEach(c => {
+            activeSlots.push(getUTC(parseInt(c.dataset.index)));
+        });
+
+        let mIdx = binData.members.findIndex(m => m.name === name);
+        if (mIdx > -1) binData.members[mIdx].availability = activeSlots;
+        else binData.members.push({ name, availability: activeSlots });
+
+        socket.emit('save-availability', binData);
+        location.reload(); 
+    };
+
+    document.getElementById('cancelBtn').onclick = () => location.reload();
+    document.addEventListener('mouseup', () => isDragging = false);
+
+    /* --- Hover --- */
+    const popup = document.createElement('div');
+    popup.className = 'status-popup';
+    popup.style.display = 'none';
+    document.body.appendChild(popup);
+
+    document.getElementById('availabilityGrid').addEventListener('mouseover', e => {
+        if (isEditing || !e.target.classList.contains('availability-cell')) return;
+        const idx = parseInt(e.target.dataset.index);
+        const present = binData.members.filter(m => 
+            m.availability.some(s => getLocalIndex(s.h, s.m, s.day) === idx)
+        ).map(m => m.name);
+        if (present.length > 0) {
+            popup.innerText = present.join(', ');
+            popup.style.display = 'block';
+            const rect = e.target.getBoundingClientRect();
+            popup.style.top = `${rect.top + window.scrollY - 35}px`;
+            popup.style.left = `${rect.left + window.scrollX}px`;
+        }
+    });
+    document.getElementById('availabilityGrid').addEventListener('mouseout', () => popup.style.display = 'none');
+
+    function logout() { localStorage.removeItem('frontier_token'); window.location.href = 'login.html'; }
+
+    buildGrid();
+    loadTeamAndLock();
+</script>
+</body>
+</html>

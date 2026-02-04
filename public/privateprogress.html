@@ -1,0 +1,180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>Progress | Echo Frontier Admin</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+    <script>
+        if (!localStorage.getItem('frontier_token')) window.location.href = 'login.html';
+    </script>
+    <style>
+        .progress-container { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; padding: 20px; }
+        .progress-card { background: #1f1f2a; border: 1px solid #2a2a3a; padding: 20px; border-radius: 12px; position: relative; }
+        .status-badge { padding: 4px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: bold; text-transform: uppercase; margin-bottom: 10px; display: inline-block; }
+        .status-unstarted { background: #3d3d4d; color: #a0a0b0; }
+        .status-in-progress { background: rgba(106, 166, 255, 0.2); color: #6aa6ff; border: 1px solid #6aa6ff; }
+        .status-finished { background: rgba(106, 255, 154, 0.2); color: #6aff9a; border: 1px solid #6aff9a; }
+        .modal { display: none; position: fixed; z-index: 2000; left: 0; top: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); backdrop-filter: blur(5px); }
+        .modal-content { background: #151520; margin: 10% auto; padding: 30px; border: 1px solid #2a2a3a; width: 400px; border-radius: 15px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+        .form-group { margin-bottom: 15px; }
+        .form-group label { display: block; margin-bottom: 5px; color: #8f98b3; }
+        .form-group input, .form-group textarea, .form-group select { width: 100%; padding: 10px; background: #0b0b10; border: 1px solid #333345; color: white; border-radius: 6px; outline: none; box-sizing: border-box; }
+        .mini-btn { background: none; border: none; cursor: pointer; color: #8f98b3; font-size: 0.85rem; padding: 5px; }
+        .mini-btn:hover { color: white; }
+    </style>
+</head>
+<body>
+
+<header>
+    <div class="header-title">
+        <img src="icon.png" alt="Icon">
+        <h1>Echo Frontier <span style="color: #6aa6ff; font-size: 0.8rem;">(Admin)</span></h1>
+    </div>
+</header>
+
+<nav>
+    <a href="private.html">Home</a>
+    <a href="privateprojects.html">Projects</a>
+    <a href="privatemembers.html">Members</a>
+    <a href="privateprogress.html" class="active">Progress</a>
+    <a href="privateavailability.html">Availability</a>
+    <a href="index.html" onclick="logout()" style="color: #f7a6a6;">Logout</a>
+</nav>
+
+<main>
+    <div style="display:flex; justify-content:space-between; align-items:center; padding: 0 20px;">
+        <h2>Development Progress</h2>
+        <button onclick="openProgressModal()" class="edit-btn" style="width:auto; padding: 10px 20px;">+ Add Task</button>
+    </div>
+    <div class="progress-container" id="progressContainer"></div>
+</main>
+
+<div id="progressModal" class="modal">
+    <div class="modal-content">
+        <h3 id="modalHeader">Add Task</h3>
+        <input type="hidden" id="editIndex">
+        <div class="form-group"><label>Title</label><input type="text" id="taskTitle"></div>
+        <div class="form-group"><label>Description</label><textarea id="taskDesc" rows="3"></textarea></div>
+        <div class="form-group">
+            <label>Status</label>
+            <select id="taskStatus">
+                <option value="Unstarted">Unstarted</option>
+                <option value="In Progress">In Progress</option>
+                <option value="Finished">Finished</option>
+            </select>
+        </div>
+        <div style="display:flex; justify-content:flex-end; gap:10px;">
+            <button onclick="closeProgressModal()" class="cancel-btn">Cancel</button>
+            <button id="finalSaveBtn" onclick="saveProgress()" class="save-btn">Save Task</button>
+        </div>
+    </div>
+</div>
+
+<script>
+    const socket = io("https://website-backend-k7zl.onrender.com");
+    let progressData = [];
+
+    function loadProgress() {
+        fetch('./data/progress.json?v=' + Date.now())
+        .then(res => res.json())
+        .then(data => {
+            progressData = Array.isArray(data) ? data : [];
+            renderProgress();
+        })
+        .catch(e => {
+            console.warn("Could not load progress.json, starting fresh.");
+            progressData = [];
+            renderProgress();
+        });
+    }
+
+    function renderProgress() {
+        const container = document.getElementById('progressContainer');
+        if (!container) return;
+        container.innerHTML = '';
+        
+        progressData.forEach((task, index) => {
+            const statusClass = task.status.toLowerCase().replace(/\s+/g, '-');
+            const card = document.createElement('div');
+            card.className = 'progress-card';
+            card.innerHTML = `
+                <span class="status-badge status-${statusClass}">${task.status}</span>
+                <h3>${task.title}</h3>
+                <p style="color:#8f98b3; font-size:0.9rem;">${task.desc}</p>
+                <div style="margin-top:15px; border-top:1px solid #2a2a3a; padding-top:10px;">
+                    <button class="mini-btn" onclick="openProgressModal(${index})"><i class="fas fa-edit"></i> Edit</button>
+                    <button class="mini-btn" onclick="deleteTask(${index})" style="color:#f7a6a6; margin-left:10px;"><i class="fas fa-trash"></i> Delete</button>
+                </div>
+            `;
+            container.appendChild(card);
+        });
+    }
+
+    function openProgressModal(index = null) {
+        document.getElementById('progressModal').style.display = 'block';
+        if (index !== null) {
+            document.getElementById('modalHeader').innerText = "Edit Task";
+            document.getElementById('editIndex').value = index;
+            document.getElementById('taskTitle').value = progressData[index].title;
+            document.getElementById('taskDesc').value = progressData[index].desc;
+            document.getElementById('taskStatus').value = progressData[index].status;
+        } else {
+            document.getElementById('modalHeader').innerText = "Add Task";
+            document.getElementById('editIndex').value = "";
+            document.getElementById('taskTitle').value = "";
+            document.getElementById('taskDesc').value = "";
+            document.getElementById('taskStatus').value = "Unstarted";
+        }
+    }
+
+    function closeProgressModal() {
+        document.getElementById('progressModal').style.display = 'none';
+    }
+
+    function saveProgress() {
+        const title = document.getElementById('taskTitle').value.trim();
+        const desc = document.getElementById('taskDesc').value.trim();
+        const status = document.getElementById('taskStatus').value;
+        const indexStr = document.getElementById('editIndex').value;
+
+        if (!title) { alert("Title is required!"); return; }
+
+        const taskObj = { title, desc, status };
+
+        if (indexStr === "") {
+            progressData.push(taskObj);
+        } else {
+            progressData[parseInt(indexStr)] = taskObj;
+        }
+
+        console.log("Emitting progress update...");
+        socket.emit('update-progress-file', progressData);
+    }
+
+    function deleteTask(index) {
+        if (confirm("Delete this task permanently?")) {
+            progressData.splice(index, 1);
+            socket.emit('update-progress-file', progressData);
+        }
+    }
+
+    socket.on('save-success', () => {
+        closeProgressModal();
+        renderProgress();
+    });
+
+    socket.on('save-error', (err) => alert(err));
+
+    function logout() {
+        console.log("Logging out...");
+        localStorage.removeItem('frontier_token');
+        window.location.href = 'login.html';
+    }
+
+    loadProgress();
+</script>
+</body>
+</html>

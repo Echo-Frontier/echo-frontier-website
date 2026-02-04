@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Contact | Echo Frontier</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+<div class="utility-bar">
+    <button class="member-login-btn" onclick="location.href='login.html'">
+        <i class="fa-solid fa-circle-user"></i> Member Dashboard
+    </button>
+</div>
+
+<header>
+  <div class="header-title">
+    <img src="icon.png" alt="Studio Icon">
+    <h1>Echo Frontier</h1>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Home</a>
+  <a href="projects.html">Projects</a>
+  <a href="members.html">Members</a>
+  <a href="contact.html" class="active">Contact</a>
+</nav>
+
+<main>
+  <h2>Contact Us</h2>
+
+  <div class="contact-card">
+    <div class="card-header">
+      <div class="label">Send us a message</div>
+      <div class="hint">We typically reply in a few business days</div>
+    </div>
+
+    <form class="contact-form" action="https://formspree.io/f/xkojoawp" method="POST">
+      <input type="text" name="name" placeholder="Your name" required>
+      <input type="email" name="email" placeholder="Your email" required>
+
+      <select name="reason" required>
+        <option value="" disabled selected>Reason for contacting</option>
+        <option value="general">General question</option>
+        <option value="collab">Collaboration</option>
+        <option value="press">Press / Media</option>
+        <option value="other">Other</option>
+      </select>
+
+      <textarea name="message" placeholder="Your message" required></textarea>
+
+      <div class="hp" aria-hidden="true">
+        <label><input name="_gotcha" tabindex="-1" autocomplete="off"></label>
+      </div>
+
+      <div class="form-note" id="form-note"></div>
+
+      <button type="submit">Send Message</button>
+    </form>
+  </div>
+</main>
+
+<footer>
+    <p>&copy; 2026 Echo Frontier Studio. Powered by Socket.io Engine.</p>
+</footer>
+
+<script>
+(function () {
+  const form = document.querySelector('.contact-form');
+  const noteEl = document.getElementById('form-note');
+  const submitBtn = form.querySelector('button[type="submit"]');
+
+  // Helper to show messages
+  function showMessage(text, opts = {}) {
+    noteEl.textContent = text;
+    noteEl.style.color = opts.positive ? '#9be7a6' : '#f7a6a6';
+  }
+
+  // If URL contains ?success=1 (legacy), show message
+  const urlParams = new URLSearchParams(window.location.search);
+  if (urlParams.get('success') === '1') {
+    showMessage('Thanks — your message was sent.', { positive: true });
+  } else {
+    noteEl.textContent = '';
+  }
+
+  // Prevent double submissions
+  function setSubmitting(isSubmitting) {
+    submitBtn.disabled = isSubmitting;
+    submitBtn.textContent = isSubmitting ? 'Sending…' : 'Send';
+  }
+
+  form.addEventListener('submit', async (e) => {
+    // If JS is disabled this won't run and the native form action will submit to Formspree
+    e.preventDefault();
+
+    // Basic validation
+    if (!form.checkValidity()) {
+      form.reportValidity();
+      return;
+    }
+
+    // Honeypot
+    if (form._gotcha && form._gotcha.value) {
+      // silently treat as success (to confuse bots)
+      showMessage('Thanks — your message was sent.', { positive: true });
+      return;
+    }
+
+    const payload = {
+      name: form.name.value.trim(),
+      email: form.email.value.trim(),
+      reason: form.reason.value || '',
+      message: form.message.value.trim(),
+      _replyto: form.email.value.trim()
+    };
+
+    setSubmitting(true);
+    showMessage('Sending…');
+
+    try {
+      const resp = await fetch(form.action, {
+        method: 'POST',
+        headers: {
+          'Accept': 'application/json',
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(payload)
+      });
+
+      if (resp.ok) {
+        // Formspree returns 200/201 and a json with message
+        showMessage('Thanks — your message was sent.', { positive: true });
+        form.reset();
+      } else {
+        let json;
+        try { json = await resp.json(); } catch(_) { json = null; }
+        // If Formspree returns validation errors, present them
+        if (json && json.errors && json.errors.length) {
+          showMessage(json.errors.map(x => x.message).join('; '));
+        } else {
+          showMessage('Failed to send message. Please try again later or use your email client.');
+        }
+      }
+    } catch (err) {
+      console.error('Contact form send error', err);
+      showMessage('Network error — check your connection and try again.');
+    } finally {
+      setSubmitting(false);
+      // keep message visible
+    }
+  });
+
+})();
+</script>
+
+</body>
+</html>

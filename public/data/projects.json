@@ -1,0 +1,11 @@
+[
+  {
+    "title": "Project Rifuto",
+    "description": "A high-octane space combat simulator featuring realistic physics and procedurally generated star systems.",
+    "images": [
+      "/public/images/projects/rifuto1.png",
+      "/public/images/projects/rifuto2.png",
+      "/public/images/projects/rifuto3.png"
+    ]
+  }
+]

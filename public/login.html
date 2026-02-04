@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Member Login | Echo Frontier</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+</head>
+<body class="login-page">
+
+<div class="login-card">
+    <div class="login-header">
+        <img src="icon.png" alt="EF">
+        <h2>Member Access</h2>
+    </div>
+    
+    <div id="login-message" class="form-note"></div>
+
+    <form id="login-form" class="contact-form">
+        <input type="text" id="username" placeholder="Username" required>
+        <input type="password" id="password" placeholder="Password" required>
+        <p class="hint">First time? Enter your username and choose a new password.</p>
+        <button type="submit">Access Dashboard</button>
+    </form>
+</div>
+
+<script>
+    const socket = io("https://website-backend-k7zl.onrender.com");
+    const form = document.getElementById('login-form');
+    const msg = document.getElementById('login-message');
+
+    form.addEventListener('submit', (e) => {
+        e.preventDefault();
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        
+        socket.emit('attempt-login', { username, password });
+    });
+
+    socket.on('login-success', (data) => {
+        msg.style.color = "#9be7a6"; // Success Green
+        msg.textContent = data.message;
+
+        // 1. Store the JWT token locally so the browser "remembers" the login
+        if (data.token) {
+            localStorage.setItem('frontier_token', data.token);
+        }
+
+        // 2. Redirect to the private member area after a short delay
+        setTimeout(() => {
+            window.location.href = 'private.html';
+        }, 1500);
+    });
+
+    socket.on('login-error', (error) => {
+        msg.style.color = "#f7a6a6";
+        msg.textContent = error;
+    });
+</script>
+</body>
+</html>

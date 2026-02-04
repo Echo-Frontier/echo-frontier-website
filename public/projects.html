@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Projects | Echo Frontier</title>
+  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+
+<div class="utility-bar">
+    <button class="member-login-btn" onclick="location.href='login.html'">
+        <i class="fa-solid fa-circle-user"></i> Member Dashboard
+    </button>
+</div>
+
+<header>
+  <div class="header-title">
+    <img src="icon.png" alt="Studio Icon">
+    <h1>Echo Frontier</h1>
+  </div>
+</header>
+
+<nav>
+  <a href="index.html">Home</a>
+  <a href="projects.html" class="active">Projects</a>
+  <a href="members.html">Members</a>
+  <a href="contact.html">Contact</a>
+</nav>
+
+<main>
+  <h2 style="margin-bottom: 40px;">Current Projects</h2>
+  <div id="projects-list" class="projects-stack">
+      </div>
+</main>
+
+<footer>
+    <p>&copy; 2026 Echo Frontier Studio. Powered by Socket.io Engine.</p>
+</footer>
+
+<script>
+  fetch('./data/projects.json')
+    .then(res => {
+      if (!res.ok) throw new Error("Could not load JSON file");
+      return res.json();
+    })
+    .then(projects => {
+      const container = document.getElementById('projects-list');
+      if (!container) return;
+      container.innerHTML = '';
+
+      projects.forEach(project => {
+        const projectEl = document.createElement('section');
+        projectEl.className = 'project-feature';
+
+        // FIX: Your JSON uses "images", not "showcase". 
+        // Also added || [] as a fallback to prevent "Cannot read property map of undefined"
+        const imageSource = project.images || project.showcase || [];
+        
+        const showcaseHtml = imageSource.map(src => 
+          `<img src="${src}" alt="${project.title || 'Project'} Screenshot" class="showcase-img" onerror="this.style.display='none'">`
+        ).join('');
+
+        projectEl.innerHTML = `
+          <div class="project-details">
+            <h2 class="project-title">${project.title || 'Untitled Project'}</h2>
+            <p class="project-description">${project.description || 'No description provided.'}</p>
+          </div>
+          <div class="project-showcase">
+            ${showcaseHtml || '<p style="color: #666; font-style: italic;">No images available for this project.</p>'}
+          </div>
+        `;
+        container.appendChild(projectEl);
+      });
+    })
+    .catch(err => {
+      console.error('Error loading projects:', err);
+      const container = document.getElementById('projects-list');
+      if (container) {
+          container.innerHTML = `
+            <div style="text-align:center; padding: 50px;">
+                <i class="fas fa-exclamation-triangle" style="font-size: 2rem; color: #f7a6a6;"></i>
+                <p style="margin-top:15px;">Unable to load projects at this time.</p>
+            </div>`;
+      }
+    });
+</script>
+</body>
+</html>
