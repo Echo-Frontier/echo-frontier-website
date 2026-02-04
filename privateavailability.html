@@ -140,7 +140,7 @@
         const currentUser = getLoggedInUser();
         const normalizedUser = currentUser ? currentUser.trim().toLowerCase() : null;
 
-        fetch('https://website-backend-k7zl.onrender.com/data/progress.json').then(res => res.json()).then(team => {
+        fetch('https://website-backend-k7zl.onrender.com/data/availability.json').then(res => res.json()).then(team => {
             const select = document.getElementById('memberSelect');
             select.innerHTML = '';
             
