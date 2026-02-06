@@ -2,26 +2,26 @@
   {
     "name": "Speedix08",
     "title": "Founder and Lead Artist",
-    "avatar": "images/team/mem1.png"
+    "avatar": "public/images/team/mem1.png"
   },
   {
     "name": "GD_Abomination",
     "title": "Lead Developer",
-    "avatar": "images/team/mem2.png"
+    "avatar": "public/images/team/mem2.png"
   },
   {
     "name": "SimLeek",
     "title": "Lead Programmer",
-    "avatar": "images/team/mem3.png"
+    "avatar": "public/images/team/mem3.png"
   },
   {
     "name": "Flame",
     "title": "Team Manager",
-    "avatar": "images/team/mem4.png"
+    "avatar": "public/images/team/mem4.png"
   },
   {
     "name": "Lele",
     "title": "Lore Master",
-    "avatar": "images/team/mem5.png"
+    "avatar": "public/images/team/mem5.png"
   }
 ]
