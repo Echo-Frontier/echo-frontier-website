@@ -3,9 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Echo Frontier | Home</title>
+  <title>Members | Echo Frontier</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+  <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
 </head>
 <body>
 
@@ -30,9 +31,17 @@
 </nav>
 
 <main>
-  <h2>The Team</h2>
+  <div class="section-intro">
+    <h2>The Frontier Team</h2>
+    <p>The architects and visionaries behind the Echo Frontier projects.</p>
+  </div>
+
   <div class="members-grid" id="members-grid">
+    <div class="loading-state">
+        <i class="fas fa-spinner fa-spin"></i>
+        <p>Accessing Team Database...</p>
     </div>
+  </div>
 </main>
 
 <footer>
@@ -40,39 +49,126 @@
 </footer>
 
 <script>
-  const jsonPath = './public/data/team.json';
+  // Connect to your Render Backend
+  const socket = io("https://website-backend-k7zl.onrender.com");
+  const container = document.getElementById('members-grid');
 
-  fetch(jsonPath)
-    .then(response => {
-      if (!response.ok) throw new Error('Failed to fetch team.json: ' + response.status);
-      return response.json();
-    })
-    .then(team => {
-      const container = document.getElementById('members-grid');
-      container.innerHTML = '';
+  // 1. When connected, request the team list
+  socket.on('connect', () => {
+    console.log("Connected to Frontier Backend");
+    socket.emit('get-members');
+  });
 
-      team.forEach(member => {
-        const card = document.createElement('div');
-        card.className = 'member-card';
+  // 2. Listen for the team data from MongoDB
+  socket.on('load-members', (team) => {
+    if (!container) return;
+    container.innerHTML = ''; // Clear loading spinner
 
-        // Check for placeholder if image is missing
-        const avatarSrc = member.avatar || 'https://via.placeholder.com/150';
+    if (!team || team.length === 0) {
+      container.innerHTML = `
+        <div style="grid-column: 1/-1; text-align:center; padding: 40px; color: #555;">
+            <p>No team members are currently listed in the database.</p>
+        </div>`;
+      return;
+    }
 
-        card.innerHTML = `
-          <img src="${avatarSrc}" alt="${member.name}">
-          <div class="member-name">${member.name}</div>
-          <div class="member-title">${member.title}</div>
-        `;
+    team.forEach(member => {
+      const card = document.createElement('div');
+      card.className = 'member-card';
 
-        container.appendChild(card);
-      });
-    })
-    .catch(err => {
-      const container = document.getElementById('members-grid');
-      container.innerHTML = '<p style="text-align:center;">Failed to load team members. Ensure team.json exists in /public/data/.</p>';
-      console.error(err);
+      // avatar will be either a URL or a Base64 string from your upload
+      const avatarSrc = member.avatar || 'https://via.placeholder.com/150?text=No+Image';
+
+      card.innerHTML = `
+        <div class="member-avatar-wrapper">
+            <img src="${avatarSrc}" alt="${member.name}" onerror="this.src='https://via.placeholder.com/150?text=Error'">
+        </div>
+        <div class="member-info">
+            <div class="member-name">${member.name}</div>
+            <div class="member-title">${member.title}</div>
+        </div>
+      `;
+
+      container.appendChild(card);
     });
+  });
+
+  // 3. Handle connection issues gracefully
+  socket.on('connect_error', () => {
+    container.innerHTML = `
+        <div style="grid-column: 1/-1; text-align:center; padding: 40px;">
+            <i class="fas fa-wifi-slash" style="font-size: 2rem; color: #f7a6a6; margin-bottom: 10px;"></i>
+            <p>Unable to reach Frontier Systems. Please check your connection.</p>
+        </div>`;
+  });
 </script>
+
+<style>
+  /* Local styles for the members grid if not in your styles.css */
+  .section-intro { text-align: center; margin-bottom: 50px; }
+  .section-intro h2 { font-size: 2.5rem; margin-bottom: 10px; }
+  
+  .members-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 30px;
+    padding: 20px;
+    max-width: 1200px;
+    margin: 0 auto;
+  }
+
+  .member-card {
+    background: #151520;
+    border: 1px solid #2a2a3a;
+    border-radius: 15px;
+    padding: 30px;
+    text-align: center;
+    transition: transform 0.3s ease, border-color 0.3s ease;
+  }
+
+  .member-card:hover {
+    transform: translateY(-10px);
+    border-color: #6aa6ff;
+  }
+
+  .member-avatar-wrapper {
+    width: 120px;
+    height: 120px;
+    margin: 0 auto 20px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 3px solid #2a2a3a;
+  }
+
+  .member-avatar-wrapper img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .member-name {
+    font-size: 1.4rem;
+    font-weight: bold;
+    color: #fff;
+    margin-bottom: 5px;
+  }
+
+  .member-title {
+    color: #6aa6ff;
+    font-size: 0.9rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+  }
+
+  .loading-state {
+    grid-column: 1/-1;
+    text-align: center;
+    padding: 50px;
+    color: #8f98b3;
+  }
+  
+  .loading-state i { font-size: 2rem; margin-bottom: 15px; }
+</style>
 
 </body>
 </html>
