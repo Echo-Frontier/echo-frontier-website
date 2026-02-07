@@ -20,13 +20,23 @@
   </div>
 </header>
 
+<nav>
+  <a href="private.html">Home</a>
+  <a href="privateprojects.html" class="active">Projects</a>
+  <a href="privatemembers.html">Members</a>
+  <a href="privateprogress.html">Progress</a>
+  <a href="privateavailability.html">Availability</a>
+  <a href="#" onclick="logout()" style="color: #f7a6a6;">Logout</a>
+</nav>
+
 <main>
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px;">
     <h2>Project Management</h2>
     <button class="edit-btn" onclick="openAddModal()">+ New Project</button>
   </div>
   
-  <div id="projects-list" class="admin-list-container"></div>
+  <div id="projects-list" class="admin-list-container">
+      </div>
 </main>
 
 <div id="project-modal" class="modal-overlay">
@@ -36,19 +46,19 @@
       <input type="hidden" id="proj-index">
       
       <label>Project Title</label>
-      <input type="text" id="proj-title" required>
+      <input type="text" id="proj-title" required placeholder="Enter project name">
       
       <label>Description</label>
-      <textarea id="proj-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;"></textarea>
+      <textarea id="proj-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;" placeholder="Describe the project..."></textarea>
       
       <label>Showcase Images (Upload Local Files)</label>
-      <div class="upload-group">
+      <div class="upload-group" style="margin-top: 10px;">
           <input type="file" class="file-input" onchange="handleFileUpload(this, 0)" accept="image/*">
           <input type="file" class="file-input" onchange="handleFileUpload(this, 1)" accept="image/*" style="margin-top:5px;">
           <input type="file" class="file-input" onchange="handleFileUpload(this, 2)" accept="image/*" style="margin-top:5px;">
       </div>
 
-      <div id="image-previews" style="display: flex; gap: 10px; margin-top: 15px;">
+      <div id="image-previews" style="display: flex; gap: 10px; margin-top: 15px; flex-wrap: wrap;">
           </div>
       
       <div class="modal-actions">
@@ -62,9 +72,11 @@
 <script>
   const socket = io("https://website-backend-k7zl.onrender.com");
   let allProjects = [];
-  let currentImageBuffers = ["", "", ""]; // Temporary storage for Base64 strings
+  let currentImageBuffers = ["", "", ""]; // Stores Base64 strings for the current modal session
 
+  // 1. Initial Load
   socket.on('connect', () => {
+    console.log("Connected to MongoDB Project System");
     socket.emit('get-projects');
   });
 
@@ -73,7 +85,7 @@
     renderProjects();
   });
 
-  // Convert local file to Base64 string
+  // 2. Image Handling (Base64)
   function handleFileUpload(input, index) {
       const file = input.files[0];
       if (!file) return;
@@ -89,40 +101,57 @@
   function updatePreviewThumbnails() {
       const container = document.getElementById('image-previews');
       container.innerHTML = '';
-      currentImageBuffers.forEach(src => {
+      currentImageBuffers.forEach((src, idx) => {
           if (src) {
-              const img = document.createElement('img');
-              img.src = src;
-              img.style = "width:60px; height:40px; object-fit:cover; border-radius:4px; border:1px solid #6aa6ff;";
-              container.appendChild(img);
+              const wrapper = document.createElement('div');
+              wrapper.style = "position: relative;";
+              wrapper.innerHTML = `
+                <img src="${src}" style="width:70px; height:50px; object-fit:cover; border-radius:4px; border:1px solid #6aa6ff;">
+                <div onclick="removeBufferImage(${idx})" style="position:absolute; top:-5px; right:-5px; background:red; color:white; border-radius:50%; width:15px; height:15px; font-size:10px; display:flex; align-items:center; justify-content:center; cursor:pointer;">&times;</div>
+              `;
+              container.appendChild(wrapper);
           }
       });
   }
 
+  function removeBufferImage(index) {
+      currentImageBuffers[index] = "";
+      updatePreviewThumbnails();
+  }
+
+  // 3. Render List
   function renderProjects() {
     const container = document.getElementById('projects-list');
     container.innerHTML = '';
+
+    if (allProjects.length === 0) {
+        container.innerHTML = '<p style="text-align:center; color:#555; padding:20px;">No projects in database.</p>';
+        return;
+    }
+
     allProjects.forEach((proj, index) => {
       const card = document.createElement('div');
       card.className = 'admin-wide-card';
-      const images = proj.images || [];
-      const imgHTML = images.map(src => `<img src="${src}" class="mini-preview">`).join('');
       
+      const images = proj.images || [];
+      const imgHTML = images.map(src => `<img src="${src}" class="mini-preview" style="width:50px; height:35px; object-fit:cover; margin-right:5px; border-radius:3px;">`).join('');
+
       card.innerHTML = `
         <div class="proj-info">
-          <h3>${proj.title}</h3>
-          <p>${proj.description || 'No description'}</p>
-          <div class="preview-strip">${imgHTML}</div>
+          <h3 style="color:#6aa6ff; margin-bottom:5px;">${proj.title}</h3>
+          <p style="color:#8f98b3; font-size:0.9rem;">${proj.description || 'No description'}</p>
+          <div style="margin-top:10px;">${imgHTML}</div>
         </div>
-        <div class="proj-actions">
-          <button class="edit-btn" onclick="openEditModal(${index})">Edit</button>
-          <button class="delete-btn" onclick="deleteProject(${index})">Delete</button>
+        <div class="proj-actions" style="display:flex; flex-direction:column; gap:10px;">
+          <button class="edit-btn" onclick="openEditModal(${index})"><i class="fa-solid fa-pen"></i> Edit</button>
+          <button class="delete-btn" onclick="deleteProject(${index})" style="background:transparent; border:1px solid #f7a6a6; color:#f7a6a6; padding:5px; border-radius:5px; cursor:pointer;"><i class="fa-solid fa-trash"></i> Delete</button>
         </div>
       `;
       container.appendChild(card);
     });
   }
 
+  // 4. Modal Logic
   function openEditModal(index) {
     const p = allProjects[index];
     document.getElementById('modal-title').innerText = "Edit Project";
@@ -130,10 +159,13 @@
     document.getElementById('proj-title').value = p.title;
     document.getElementById('proj-desc').value = p.description || '';
     
-    // Load existing images into buffer
-    currentImageBuffers = [...(p.images || ["", "", ""])];
+    // Fill buffers with existing data
+    currentImageBuffers = [
+        p.images?.[0] || "",
+        p.images?.[1] || "",
+        p.images?.[2] || ""
+    ];
     updatePreviewThumbnails();
-    
     document.getElementById('project-modal').style.display = 'flex';
   }
 
@@ -148,6 +180,7 @@
 
   function closeModal() { document.getElementById('project-modal').style.display = 'none'; }
 
+  // 5. Save to MongoDB
   document.getElementById('project-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const idx = document.getElementById('proj-index').value;
@@ -155,7 +188,7 @@
     const projectData = {
       title: document.getElementById('proj-title').value,
       description: document.getElementById('proj-desc').value,
-      images: currentImageBuffers.filter(src => src !== "") // Only save actual images
+      images: currentImageBuffers.filter(src => src !== "") 
     };
 
     if (idx === "new") allProjects.push(projectData);
@@ -166,10 +199,10 @@
   });
 
   function deleteProject(index) {
-    if(confirm("Delete project?")) {
-        allProjects.splice(index, 1);
-        socket.emit('update-projects-file', allProjects);
-    }
+      if(confirm(`Permanently delete "${allProjects[index].title}"?`)) {
+          allProjects.splice(index, 1);
+          socket.emit('update-projects-file', allProjects);
+      }
   }
 
   function logout() { localStorage.removeItem('frontier_token'); window.location.href = 'login.html'; }
