@@ -13,7 +13,15 @@
     <style>
         /* ---------- Base Layout ---------- */
         main { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px 15px; }
-        h2 { font-size: 1.5rem; color: #fff; margin-bottom: 20px; }
+        
+        .page-header {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+
+        h2 { font-size: 1.5rem; color: #fff; }
 
         /* ---------- Grid Container & Smart Zoom ---------- */
         .grid-container {
@@ -34,21 +42,14 @@
             border-radius: 12px;
             border: 1px solid #2a2a3a;
             overflow-x: auto;
-            transform-origin: top left; /* Critical for alignment */
+            transform-origin: top left;
             transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), width 0.4s ease;
-            width: 100%; /* Default */
+            width: 100%;
         }
 
-        /* Lock scroll when zoomed out */
-        .grid-wrapper.zoomed-out {
-            overflow: hidden; 
-        }
+        .grid-wrapper.zoomed-out { overflow: hidden; }
 
-        .zoom-controls {
-            display: flex;
-            justify-content: flex-end;
-            margin-bottom: 12px;
-        }
+        .zoom-controls { display: flex; justify-content: flex-end; margin-bottom: 12px; }
 
         .zoom-btn {
             background: rgba(106, 166, 255, 0.1);
@@ -75,6 +76,22 @@
         .availability-cell { width: 100%; height: 20px; background: #1f1f2a; border-radius: 2px; border: 1px solid rgba(255,255,255,0.02); }
         .availability-cell.active { background: #6aa6ff !important; box-shadow: inset 0 0 8px rgba(0,0,0,0.3); }
 
+        /* Member Popup Tooltip */
+        .status-popup {
+            position: absolute;
+            background: #6aa6ff;
+            color: #061025;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 2000;
+            white-space: nowrap;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            display: none;
+        }
+
         /* ---------- Edit UI ---------- */
         .edit-controls { display: flex; flex-direction: column; gap: 12px; background: #1f1f2a; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #2a2a3a; }
         .btn-group { display: flex; gap: 10px; width: 100%; }
@@ -84,8 +101,9 @@
         .cancel-btn { background: #2a2a3a; color: #fff; flex: 1; }
         select { background: #0b0b10; color: white; border: 1px solid #333345; padding: 12px; border-radius: 8px; width: 100%; }
 
-        /* ---------- Desktop Media Query ---------- */
+        /* ---------- PC DESIGN ---------- */
         @media (min-width: 1024px) {
+            .page-header { flex-direction: row; justify-content: space-between; align-items: center; }
             .zoom-controls { display: none; }
             .grid-wrapper { grid-template-columns: 80px 1fr; padding: 30px; overflow-x: hidden; transform: none !important; width: 100% !important; }
             .grid-container { height: auto !important; }
@@ -112,11 +130,11 @@
     <a href="privatemembers.html">Members</a>
     <a href="privateprogress.html">Progress</a>
     <a href="privateavailability.html" class="active">Availability</a>
-    <a href="#" onclick="logout()" style="color: #f7a6a6;">Logout</a>
+    <a href="index.html" onclick="logout()" style="color: #f7a6a6;">Logout</a>
 </nav>
 
 <main>
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
+    <div class="page-header">
         <h2>Team Availability</h2>
         <button id="editBtn" class="edit-btn">Enter Edit Mode</button>
     </div>
@@ -155,7 +173,11 @@
     const ROWS = 48; 
     let isEditing = false, isDragging = false, dragState = null, binData = { members: [] };
 
-    /* --- Fixed Dynamic Zoom Feature --- */
+    /* --- Create Tooltip Element --- */
+    const popup = document.createElement('div');
+    popup.className = 'status-popup';
+    document.body.appendChild(popup);
+
     function toggleZoom(forceReset = false) {
         const wrapper = document.getElementById('gridWrapper');
         const container = document.getElementById('gridContainer');
@@ -163,7 +185,6 @@
         const isZoomed = wrapper.classList.contains('zoomed-out');
         
         if (isZoomed || forceReset) {
-            // Reset to normal
             wrapper.style.transform = `scale(1)`;
             wrapper.style.width = "100%";
             wrapper.classList.remove('zoomed-out');
@@ -171,38 +192,18 @@
             btn.querySelector('span').textContent = "Full View";
             btn.querySelector('i').className = "fas fa-expand-alt";
         } else {
-            // 1. Get widths
             const containerWidth = container.offsetWidth;
             const scrollWidth = wrapper.scrollWidth;
-            
-            // 2. Calculate Scale Ratio
             const scaleRatio = (containerWidth / scrollWidth);
 
-            // 3. APPLY FIX: Expand the base width so that after scaling down, it equals the container width
-            // Formula: BaseWidth = 100% / scaleRatio
             wrapper.style.width = (100 / scaleRatio) + "%";
             wrapper.style.transform = `scale(${scaleRatio})`;
-            
             wrapper.classList.add('zoomed-out');
-            
-            // 4. Adjust container height to match scaled visual height
             container.style.height = (wrapper.offsetHeight * scaleRatio) + "px";
             
             btn.querySelector('span').textContent = "Exit Full View";
             btn.querySelector('i').className = "fas fa-compress-alt";
         }
-    }
-
-    /* --- Auth & Initialization --- */
-    function getLoggedInUser() {
-        const token = localStorage.getItem('frontier_token');
-        if (!token) return null;
-        try {
-            const base64Url = token.split('.')[1];
-            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
-            return JSON.parse(jsonPayload).username;
-        } catch (e) { return null; }
     }
 
     function buildGrid() {
@@ -229,46 +230,75 @@
             cell.className = 'availability-cell';
             cell.dataset.index = i;
             
-            const handleInteract = (e) => {
+            cell.addEventListener('mousedown', (e) => {
                 if (!isEditing) return;
-                isDragging = true;
-                dragState = !cell.classList.contains('active');
+                isDragging = true; dragState = !cell.classList.contains('active');
                 cell.classList.toggle('active', dragState);
-            };
-
-            cell.addEventListener('mousedown', handleInteract);
+            });
             cell.addEventListener('touchstart', (e) => {
-                if(isEditing) { e.preventDefault(); handleInteract(); }
+                if(isEditing) { e.preventDefault(); isDragging = true; dragState = !cell.classList.contains('active'); cell.classList.toggle('active', dragState); }
             }, {passive: false});
             cell.addEventListener('mouseenter', () => { if (isEditing && isDragging) cell.classList.toggle('active', dragState); });
+
+            // TOOLTIP LOGIC
+            cell.addEventListener('mouseover', (e) => {
+                if (isEditing) return;
+                const idx = parseInt(cell.dataset.index);
+                const present = binData.members.filter(m => m.availability.some(s => getLocalIndex(s.h, s.m, s.day) === idx)).map(m => m.name);
+                if (present.length > 0) {
+                    popup.innerText = present.join(', ');
+                    popup.style.display = 'block';
+                    const rect = cell.getBoundingClientRect();
+                    popup.style.top = `${rect.top + window.scrollY - 35}px`;
+                    popup.style.left = `${rect.left + window.scrollX}px`;
+                }
+            });
+            cell.addEventListener('mouseout', () => popup.style.display = 'none');
+
             grid.appendChild(cell);
         }
     }
 
-    socket.on('connect', () => {
-        socket.emit('get-members');
-        socket.emit('get-availability');
-    });
+    /* --- Helper Functions --- */
+    function getLoggedInUser() {
+        const token = localStorage.getItem('frontier_token');
+        if (!token) return null;
+        try {
+            const base64Url = token.split('.')[1];
+            const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+            const jsonPayload = decodeURIComponent(atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+            return JSON.parse(jsonPayload).username;
+        } catch (e) { return null; }
+    }
 
+    function getUTC(index) {
+        const row = Math.floor(index / 7), col = index % 7;
+        const h = Math.floor(row / 2), m = (row % 2) * 30;
+        const localDate = new Date(1970, 0, 4 + col, h, m, 0);
+        return { day: localDate.getUTCDay(), h: localDate.getUTCHours(), m: localDate.getUTCMinutes() };
+    }
+
+    function getLocalIndex(hUTC, mUTC, dUTC) {
+        const utcDate = new Date(Date.UTC(1970, 0, 4, hUTC, mUTC, 0));
+        const dayOffset = (dUTC - utcDate.getUTCDay() + 7) % 7;
+        utcDate.setUTCDate(utcDate.getUTCDate() + dayOffset);
+        return (Math.floor((utcDate.getHours() * 2) + (utcDate.getMinutes() >= 30 ? 1 : 0)) * 7) + utcDate.getDay();
+    }
+
+    /* --- Socket Logic --- */
+    socket.on('connect', () => { socket.emit('get-members'); socket.emit('get-availability'); });
     socket.on('load-members', (members) => {
         const select = document.getElementById('memberSelect');
         const currentUser = getLoggedInUser();
         select.innerHTML = '';
-        let found = false;
         members.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m.name; opt.textContent = m.name;
-            if (m.name.toLowerCase() === currentUser?.toLowerCase()) { opt.selected = true; found = true; } 
-            else { opt.disabled = true; }
+            if (m.name.toLowerCase() !== currentUser?.toLowerCase()) opt.disabled = true;
+            else opt.selected = true;
             select.appendChild(opt);
         });
-        if (!found && currentUser) {
-            const opt = document.createElement('option');
-            opt.value = currentUser; opt.textContent = currentUser + " (New)";
-            opt.selected = true; select.appendChild(opt);
-        }
     });
-
     socket.on('load-availability', data => { binData = data || { members: [] }; applyHeatmap(); });
 
     function applyHeatmap() {
@@ -292,30 +322,14 @@
         });
     }
 
-    function getUTC(index) {
-        const row = Math.floor(index / 7), col = index % 7;
-        const h = Math.floor(row / 2), m = (row % 2) * 30;
-        const localDate = new Date(1970, 0, 4 + col, h, m, 0);
-        return { day: localDate.getUTCDay(), h: localDate.getUTCHours(), m: localDate.getUTCMinutes() };
-    }
-
-    function getLocalIndex(hUTC, mUTC, dUTC) {
-        const utcDate = new Date(Date.UTC(1970, 0, 4, hUTC, mUTC, 0));
-        const dayOffset = (dUTC - utcDate.getUTCDay() + 7) % 7;
-        utcDate.setUTCDate(utcDate.getUTCDate() + dayOffset);
-        return (Math.floor((utcDate.getHours() * 2) + (utcDate.getMinutes() >= 30 ? 1 : 0)) * 7) + utcDate.getDay();
-    }
-
+    /* --- Controls --- */
     document.getElementById('editBtn').onclick = () => {
-        const select = document.getElementById('memberSelect');
-        const currentUser = getLoggedInUser();
-        if (!currentUser || select.value.toLowerCase() !== currentUser.toLowerCase()) return alert("Access Denied.");
         toggleZoom(true); 
         isEditing = true;
         document.getElementById('editControls').style.display = 'flex';
         document.getElementById('editBtn').style.display = 'none';
         document.querySelectorAll('.availability-cell').forEach(c => { c.classList.add('editable'); c.style.background = ''; });
-        select.dispatchEvent(new Event('change'));
+        document.getElementById('memberSelect').dispatchEvent(new Event('change'));
     };
 
     document.getElementById('saveBtn').onclick = () => {
@@ -326,14 +340,12 @@
         if (mIdx > -1) binData.members[mIdx].availability = activeSlots;
         else binData.members.push({ name, availability: activeSlots });
         socket.emit('save-availability', binData);
-        alert("Availability Saved!");
-        location.reload(); 
+        alert("Availability Saved!"); location.reload(); 
     };
 
     document.getElementById('cancelBtn').onclick = () => location.reload();
     document.addEventListener('mouseup', () => isDragging = false);
     document.addEventListener('touchend', () => isDragging = false);
-
     function logout() { localStorage.removeItem('frontier_token'); window.location.href = 'login.html'; }
 
     buildGrid();
