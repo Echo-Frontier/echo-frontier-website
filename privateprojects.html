@@ -10,45 +10,6 @@
   <script>
     if (!localStorage.getItem('frontier_token')) window.location.href = 'login.html';
   </script>
-  <style>
-    /* Admin UI specific styles */
-    .mini-preview {
-      width: 60px;
-      height: 40px;
-      object-fit: cover;
-      border-radius: 4px;
-      border: 1px solid #3d3d4d;
-      margin-right: 5px;
-    }
-    .preview-strip {
-      margin-top: 10px;
-      display: flex;
-    }
-    .admin-wide-card {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      background: #151520;
-      padding: 20px;
-      border-radius: 12px;
-      margin-bottom: 15px;
-      border: 1px solid #2a2a3a;
-    }
-    .proj-info h3 { color: #6aa6ff; margin-bottom: 5px; }
-    .proj-info p { color: #8f98b3; font-size: 0.9rem; max-width: 400px; }
-    .proj-actions { display: flex; flex-direction: column; gap: 10px; }
-    
-    .delete-btn {
-      background: transparent;
-      border: 1px solid #f7a6a6;
-      color: #f7a6a6;
-      padding: 8px;
-      border-radius: 6px;
-      cursor: pointer;
-      transition: 0.2s;
-    }
-    .delete-btn:hover { background: #f7a6a6; color: white; }
-  </style>
 </head>
 <body>
 
@@ -59,23 +20,13 @@
   </div>
 </header>
 
-<nav>
-  <a href="private.html">Home</a>
-  <a href="privateprojects.html" class="active">Projects</a>
-  <a href="privatemembers.html">Members</a>
-  <a href="privateprogress.html">Progress</a>
-  <a href="privateavailability.html">Availability</a>
-  <a href="#" onclick="logout()" style="color: #f7a6a6;">Logout</a>
-</nav>
-
 <main>
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px;">
     <h2>Project Management</h2>
     <button class="edit-btn" onclick="openAddModal()">+ New Project</button>
   </div>
   
-  <div id="projects-list" class="admin-list-container">
-    </div>
+  <div id="projects-list" class="admin-list-container"></div>
 </main>
 
 <div id="project-modal" class="modal-overlay">
@@ -85,15 +36,20 @@
       <input type="hidden" id="proj-index">
       
       <label>Project Title</label>
-      <input type="text" id="proj-title" required placeholder="Project Name">
+      <input type="text" id="proj-title" required>
       
       <label>Description</label>
-      <textarea id="proj-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;" placeholder="What is this project about?"></textarea>
+      <textarea id="proj-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;"></textarea>
       
-      <label>Showcase Images (URLs)</label>
-      <input type="text" id="proj-img1" placeholder="Image 1 URL" style="margin-bottom:5px;">
-      <input type="text" id="proj-img2" placeholder="Image 2 URL" style="margin-bottom:5px;">
-      <input type="text" id="proj-img3" placeholder="Image 3 URL">
+      <label>Showcase Images (Upload Local Files)</label>
+      <div class="upload-group">
+          <input type="file" class="file-input" onchange="handleFileUpload(this, 0)" accept="image/*">
+          <input type="file" class="file-input" onchange="handleFileUpload(this, 1)" accept="image/*" style="margin-top:5px;">
+          <input type="file" class="file-input" onchange="handleFileUpload(this, 2)" accept="image/*" style="margin-top:5px;">
+      </div>
+
+      <div id="image-previews" style="display: flex; gap: 10px; margin-top: 15px;">
+          </div>
       
       <div class="modal-actions">
         <button type="button" onclick="closeModal()" class="cancel-btn">Cancel</button>
@@ -106,10 +62,9 @@
 <script>
   const socket = io("https://website-backend-k7zl.onrender.com");
   let allProjects = [];
+  let currentImageBuffers = ["", "", ""]; // Temporary storage for Base64 strings
 
-  // 1. Initial Connection & Data Load
   socket.on('connect', () => {
-    console.log("Connected to MongoDB Project Sync");
     socket.emit('get-projects');
   });
 
@@ -118,47 +73,67 @@
     renderProjects();
   });
 
+  // Convert local file to Base64 string
+  function handleFileUpload(input, index) {
+      const file = input.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = (e) => {
+          currentImageBuffers[index] = e.target.result;
+          updatePreviewThumbnails();
+      };
+      reader.readAsDataURL(file);
+  }
+
+  function updatePreviewThumbnails() {
+      const container = document.getElementById('image-previews');
+      container.innerHTML = '';
+      currentImageBuffers.forEach(src => {
+          if (src) {
+              const img = document.createElement('img');
+              img.src = src;
+              img.style = "width:60px; height:40px; object-fit:cover; border-radius:4px; border:1px solid #6aa6ff;";
+              container.appendChild(img);
+          }
+      });
+  }
+
   function renderProjects() {
     const container = document.getElementById('projects-list');
     container.innerHTML = '';
-
-    if (allProjects.length === 0) {
-      container.innerHTML = `<p style="color:#555; text-align:center; padding:20px;">No projects found in database.</p>`;
-      return;
-    }
-
     allProjects.forEach((proj, index) => {
       const card = document.createElement('div');
       card.className = 'admin-wide-card';
-      
       const images = proj.images || [];
-      const imgHTML = images.map(src => `<img src="${src}" class="mini-preview" onerror="this.src='https://placehold.co/60x40?text=Error'">`).join('');
-
+      const imgHTML = images.map(src => `<img src="${src}" class="mini-preview">`).join('');
+      
       card.innerHTML = `
         <div class="proj-info">
           <h3>${proj.title}</h3>
-          <p>${proj.description || 'No description provided'}</p>
-          <div class="preview-strip">${imgHTML || '<span style="font-size:0.7rem; color:#555;">No images</span>'}</div>
+          <p>${proj.description || 'No description'}</p>
+          <div class="preview-strip">${imgHTML}</div>
         </div>
         <div class="proj-actions">
-          <button class="edit-btn" onclick="openEditModal(${index})"><i class="fa-solid fa-pen"></i> Edit</button>
-          <button class="delete-btn" onclick="deleteProject(${index})"><i class="fa-solid fa-trash"></i> Delete</button>
+          <button class="edit-btn" onclick="openEditModal(${index})">Edit</button>
+          <button class="delete-btn" onclick="deleteProject(${index})">Delete</button>
         </div>
       `;
       container.appendChild(card);
     });
   }
 
-  // 2. Modal Controls
   function openEditModal(index) {
     const p = allProjects[index];
     document.getElementById('modal-title').innerText = "Edit Project";
     document.getElementById('proj-index').value = index;
     document.getElementById('proj-title').value = p.title;
     document.getElementById('proj-desc').value = p.description || '';
-    document.getElementById('proj-img1').value = p.images?.[0] || '';
-    document.getElementById('proj-img2').value = p.images?.[1] || '';
-    document.getElementById('proj-img3').value = p.images?.[2] || '';
+    
+    // Load existing images into buffer
+    currentImageBuffers = [...(p.images || ["", "", ""])];
+    updatePreviewThumbnails();
+    
     document.getElementById('project-modal').style.display = 'flex';
   }
 
@@ -166,12 +141,13 @@
     document.getElementById('modal-title').innerText = "New Project";
     document.getElementById('proj-index').value = "new";
     document.getElementById('project-form').reset();
+    currentImageBuffers = ["", "", ""];
+    updatePreviewThumbnails();
     document.getElementById('project-modal').style.display = 'flex';
   }
 
   function closeModal() { document.getElementById('project-modal').style.display = 'none'; }
 
-  // 3. Save / Update Logic
   document.getElementById('project-form').addEventListener('submit', (e) => {
     e.preventDefault();
     const idx = document.getElementById('proj-index').value;
@@ -179,33 +155,22 @@
     const projectData = {
       title: document.getElementById('proj-title').value,
       description: document.getElementById('proj-desc').value,
-      images: [
-        document.getElementById('proj-img1').value,
-        document.getElementById('proj-img2').value,
-        document.getElementById('proj-img3').value
-      ].filter(path => path.trim() !== "") // Clean up empty URL inputs
+      images: currentImageBuffers.filter(src => src !== "") // Only save actual images
     };
 
-    if (idx === "new") {
-      allProjects.push(projectData);
-    } else {
-      allProjects[parseInt(idx)] = projectData;
-    }
+    if (idx === "new") allProjects.push(projectData);
+    else allProjects[parseInt(idx)] = projectData;
 
-    // Sync with MongoDB
     socket.emit('update-projects-file', allProjects);
     closeModal();
   });
 
-  // 4. Delete Logic
   function deleteProject(index) {
-    if (confirm(`Are you sure you want to delete "${allProjects[index].title}"?`)) {
-      allProjects.splice(index, 1);
-      socket.emit('update-projects-file', allProjects);
+    if(confirm("Delete project?")) {
+        allProjects.splice(index, 1);
+        socket.emit('update-projects-file', allProjects);
     }
   }
-
-  socket.on('save-success', () => console.log("Project Sync Successful"));
 
   function logout() { localStorage.removeItem('frontier_token'); window.location.href = 'login.html'; }
 </script>
