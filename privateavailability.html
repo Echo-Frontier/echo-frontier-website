@@ -11,19 +11,159 @@
         if (!localStorage.getItem('frontier_token')) window.location.href = 'login.html';
     </script>
     <style>
-        .grid-wrapper { display: grid; grid-template-columns: 80px 1fr; gap: 10px; overflow-x: auto; background: #151520; padding: 20px; border-radius: 12px; border: 1px solid #2a2a3a; }
-        .days-header { display: grid; grid-template-columns: repeat(7, 1fr); margin-bottom: 10px; }
-        .days-header div { text-align: center; color: #6aa6ff; font-weight: bold; font-size: 0.9rem; text-transform: uppercase; }
-        .time-labels { display: flex; flex-direction: column; gap: 0; margin-top: 28px; }
-        .time-labels div { height: 22px; line-height: 22px; font-size: 0.65rem; color: #8f98b3; text-align: right; padding-right: 10px; }
-        .availability-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; width: 100%; }
-        .availability-cell { width: 100%; height: 20px; background: #1f1f2a; border-radius: 2px; transition: background 0.1s; border: 1px solid rgba(255,255,255,0.02); }
+        /* ---------- Base Layout & Main Container ---------- */
+        main {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px 15px;
+        }
+
+        h2 { font-size: 1.5rem; color: #fff; margin-bottom: 20px; }
+
+        /* ---------- Grid Wrapper & Mobile Swipe Handling ---------- */
+        .grid-wrapper {
+            display: grid;
+            grid-template-columns: 60px 1fr;
+            gap: 10px;
+            background: #151520;
+            padding: 15px;
+            border-radius: 12px;
+            border: 1px solid #2a2a3a;
+            overflow-x: auto; /* Allows horizontal swipe on mobile */
+            position: relative;
+            scrollbar-width: thin;
+            scrollbar-color: #6aa6ff #151520;
+        }
+
+        .grid-wrapper::-webkit-scrollbar { height: 6px; }
+        .grid-wrapper::-webkit-scrollbar-thumb { background: #2a2a3a; border-radius: 10px; }
+
+        .days-header {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(100px, 1fr)); 
+            margin-bottom: 10px;
+        }
+
+        .days-header div {
+            text-align: center;
+            color: #6aa6ff;
+            font-weight: bold;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .time-labels {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+            margin-top: 28px;
+        }
+
+        .time-labels div {
+            height: 22px;
+            line-height: 22px;
+            font-size: 0.6rem;
+            color: #8f98b3;
+            text-align: right;
+            padding-right: 8px;
+        }
+
+        .availability-grid {
+            display: grid;
+            grid-template-columns: repeat(7, minmax(100px, 1fr)); 
+            gap: 2px;
+        }
+
+        .availability-cell {
+            width: 100%;
+            height: 20px;
+            background: #1f1f2a;
+            border-radius: 2px;
+            transition: background 0.1s;
+            border: 1px solid rgba(255,255,255,0.02);
+        }
+
         .availability-cell.editable { cursor: crosshair; }
-        .availability-cell.editable:hover { border-color: #6aa6ff; }
-        .availability-cell.active { background: #6aa6ff !important; box-shadow: inset 0 0 8px rgba(0,0,0,0.3); }
-        .edit-controls { display: flex; align-items: center; gap: 12px; background: #1f1f2a; padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #2a2a3a; }
-        select { background: #0b0b10; color: white; border: 1px solid #333345; padding: 8px; border-radius: 6px; outline: none; }
-        .status-popup { position: absolute; background: #6aa6ff; color: #061025; padding: 5px 12px; border-radius: 4px; font-size: 0.8rem; font-weight: bold; pointer-events: none; z-index: 1000; box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        .availability-cell.active { 
+            background: #6aa6ff !important; 
+            box-shadow: inset 0 0 8px rgba(0,0,0,0.3); 
+        }
+
+        /* ---------- Controls & Buttons ---------- */
+        .edit-controls {
+            display: flex;
+            flex-direction: column; 
+            gap: 12px;
+            background: #1f1f2a;
+            padding: 20px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #2a2a3a;
+        }
+
+        .btn-group {
+            display: flex;
+            gap: 10px;
+            width: 100%;
+        }
+
+        .edit-btn, .save-btn, .cancel-btn {
+            width: 100%;
+            padding: 14px;
+            border-radius: 8px;
+            font-weight: 700;
+            border: none;
+            cursor: pointer;
+            transition: 0.2s;
+        }
+
+        .edit-btn { background: #6aa6ff; color: #061025; }
+        .save-btn { background: #6aa6ff; color: #061025; flex: 2; }
+        .cancel-btn { background: #2a2a3a; color: #fff; flex: 1; }
+
+        select {
+            background: #0b0b10;
+            color: white;
+            border: 1px solid #333345;
+            padding: 12px;
+            border-radius: 8px;
+            outline: none;
+            font-size: 1rem;
+            width: 100%;
+        }
+
+        .status-popup {
+            position: absolute;
+            background: #6aa6ff;
+            color: #061025;
+            padding: 5px 12px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+            font-weight: bold;
+            pointer-events: none;
+            z-index: 1000;
+            white-space: nowrap;
+        }
+
+        /* ==========================================
+           PC DESIGN (Screens 1024px and up)
+           ========================================== */
+        @media (min-width: 1024px) {
+            main { padding: 40px 24px; }
+            h2 { font-size: 2rem; }
+            .grid-wrapper { grid-template-columns: 80px 1fr; padding: 30px; overflow-x: hidden; }
+            .days-header, .availability-grid { grid-template-columns: repeat(7, 1fr); }
+            .days-header div { font-size: 0.9rem; }
+            .time-labels div { font-size: 0.65rem; }
+
+            .edit-controls { flex-direction: row; align-items: center; padding: 15px 25px; }
+            .btn-group { width: auto; }
+            select { width: 200px; padding: 8px; }
+            .edit-btn, .save-btn, .cancel-btn { width: auto; padding: 10px 25px; }
+            .availability-cell.editable:hover { border-color: #6aa6ff; }
+        }
     </style>
 </head>
 <body>
@@ -41,20 +181,24 @@
     <a href="privatemembers.html">Members</a>
     <a href="privateprogress.html">Progress</a>
     <a href="privateavailability.html" class="active">Availability</a>
-    <a href="index.html" onclick="logout()" style="color: #f7a6a6;">Logout</a>
+    <a href="#" onclick="logout()" style="color: #f7a6a6;">Logout</a>
 </nav>
 
 <main>
     <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:20px;">
         <h2>Team Availability</h2>
-        <button id="editBtn" class="edit-btn" style="width: auto; padding: 10px 25px;">Enter Edit Mode</button>
+        <button id="editBtn" class="edit-btn">Enter Edit Mode</button>
     </div>
 
     <div class="edit-controls" id="editControls" style="display:none;">
-        <label>Account:</label>
-        <select id="memberSelect"></select>
-        <button id="saveBtn" class="save-btn" style="padding: 8px 20px;">Save Changes</button>
-        <button id="cancelBtn" class="cancel-btn" style="padding: 8px 20px;">Cancel</button>
+        <div style="flex-grow: 1;">
+            <label style="display:block; font-size: 0.8rem; color: #8f98b3; margin-bottom: 5px;">Editing Account:</label>
+            <select id="memberSelect"></select>
+        </div>
+        <div class="btn-group">
+            <button id="saveBtn" class="save-btn">Save</button>
+            <button id="cancelBtn" class="cancel-btn">Cancel</button>
+        </div>
     </div>
 
     <div class="grid-wrapper">
@@ -73,7 +217,6 @@
     
     let isEditing = false, isDragging = false, dragState = null, binData = { members: [] };
 
-    /* --- Auth: Extract Username from JWT --- */
     function getLoggedInUser() {
         const token = localStorage.getItem('frontier_token');
         if (!token) return null;
@@ -85,39 +228,52 @@
         } catch (e) { return null; }
     }
 
-    /* --- UI Construction --- */
     function buildGrid() {
+        const dHeader = document.getElementById('daysHeader');
+        dHeader.innerHTML = '';
         days.forEach(d => {
             const div = document.createElement('div');
             div.textContent = d;
-            document.getElementById('daysHeader').appendChild(div);
+            dHeader.appendChild(div);
         });
+
+        const tLabels = document.getElementById('timeLabels');
+        tLabels.innerHTML = '';
         for (let h = 0; h < 24; h++) {
             for (let i = 0; i < 2; i++) {
                 const div = document.createElement('div');
                 div.textContent = `${h.toString().padStart(2, '0')}:${i === 0 ? '00' : '30'}`;
-                document.getElementById('timeLabels').appendChild(div);
+                tLabels.appendChild(div);
             }
         }
+
         const grid = document.getElementById('availabilityGrid');
+        grid.innerHTML = '';
         for (let i = 0; i < ROWS * 7; i++) {
             const cell = document.createElement('div');
             cell.className = 'availability-cell';
             cell.dataset.index = i;
-            cell.addEventListener('mousedown', e => {
+            
+            const handleInteract = (e) => {
                 if (!isEditing) return;
                 isDragging = true;
                 dragState = !cell.classList.contains('active');
                 cell.classList.toggle('active', dragState);
-            });
+            };
+
+            cell.addEventListener('mousedown', handleInteract);
+            cell.addEventListener('touchstart', (e) => {
+                if(isEditing) { e.preventDefault(); handleInteract(); }
+            }, {passive: false});
+
             cell.addEventListener('mouseenter', () => {
                 if (isEditing && isDragging) cell.classList.toggle('active', dragState);
             });
+            
             grid.appendChild(cell);
         }
     }
 
-    /* --- Time/Sync Utilities --- */
     function getUTC(index) {
         const row = Math.floor(index / 7), col = index % 7;
         const h = Math.floor(row / 2), m = (row % 2) * 30;
@@ -133,36 +289,28 @@
         return (row * 7) + utcDate.getDay();
     }
 
-    /* --- Data Loading & Synchronization --- */
     socket.on('connect', () => {
-        socket.emit('get-members'); // Populate dropdown from Team DB
-        socket.emit('get-availability'); // Get the heatmap data
+        socket.emit('get-members');
+        socket.emit('get-availability');
     });
 
     socket.on('load-members', (members) => {
         const select = document.getElementById('memberSelect');
         const currentUser = getLoggedInUser();
         select.innerHTML = '';
-        
         let found = false;
         members.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m.name; opt.textContent = m.name;
             if (m.name.toLowerCase() === currentUser?.toLowerCase()) {
-                opt.selected = true;
-                found = true;
-            } else {
-                opt.disabled = true; // Security: Can't pick others
-            }
+                opt.selected = true; found = true;
+            } else { opt.disabled = true; }
             select.appendChild(opt);
         });
-
-        // If user is logged in but not in the "Team" database yet
         if (!found && currentUser) {
             const opt = document.createElement('option');
             opt.value = currentUser; opt.textContent = currentUser + " (New)";
-            opt.selected = true;
-            select.appendChild(opt);
+            opt.selected = true; select.appendChild(opt);
         }
     });
 
@@ -173,10 +321,8 @@
 
     function applyHeatmap() {
         if (isEditing) return;
-        document.querySelectorAll('.availability-cell').forEach(c => { 
-            c.style.background = '#1f1f2a'; 
-            c.classList.remove('active'); 
-        });
+        const cells = document.querySelectorAll('.availability-cell');
+        cells.forEach(c => { c.style.background = '#1f1f2a'; c.classList.remove('active'); });
 
         if (!binData.members || !binData.members.length) return;
         const counts = {}; let max = 0;
@@ -188,63 +334,41 @@
             });
         });
         Object.keys(counts).forEach(idx => {
-            const cells = document.querySelectorAll('.availability-cell');
             if (cells[idx]) {
                 const intensity = counts[idx] / max;
-                const opacity = 0.15 + (intensity * 0.85);
-                cells[idx].style.background = `rgba(106, 166, 255, ${opacity})`;
+                cells[idx].style.background = `rgba(106, 166, 255, ${0.15 + (intensity * 0.85)})`;
             }
         });
     }
 
-    /* --- Event Handlers --- */
     document.getElementById('editBtn').onclick = () => {
         const select = document.getElementById('memberSelect');
         const currentUser = getLoggedInUser();
-        
-        if (!currentUser || select.value.toLowerCase() !== currentUser.toLowerCase()) {
-            return alert("Access Denied: You can only edit your own data.");
-        }
-
+        if (!currentUser || select.value.toLowerCase() !== currentUser.toLowerCase()) return alert("Access Denied.");
         isEditing = true;
         document.getElementById('editControls').style.display = 'flex';
         document.getElementById('editBtn').style.display = 'none';
         select.style.pointerEvents = 'none';
-        
-        document.querySelectorAll('.availability-cell').forEach(c => {
-            c.classList.add('editable');
-            c.style.background = ''; // Clear heatmap to see active slots clearly
-        });
-        // Trigger manual loading of user's current data
+        document.querySelectorAll('.availability-cell').forEach(c => { c.classList.add('editable'); c.style.background = ''; });
         select.dispatchEvent(new Event('change'));
     };
 
     document.getElementById('memberSelect').onchange = (e) => {
         document.querySelectorAll('.availability-cell').forEach(c => c.classList.remove('active'));
         const member = binData.members.find(m => m.name.toLowerCase() === e.target.value.toLowerCase());
-        if (member) {
-            member.availability.forEach(slot => {
-                const idx = getLocalIndex(slot.h, slot.m, slot.day);
-                const cell = document.querySelector(`[data-index="${idx}"]`);
-                if (cell) cell.classList.add('active');
-            });
-        }
+        if (member) member.availability.forEach(slot => {
+            const cell = document.querySelector(`[data-index="${getLocalIndex(slot.h, slot.m, slot.day)}"]`);
+            if (cell) cell.classList.add('active');
+        });
     };
 
     document.getElementById('saveBtn').onclick = () => {
         const name = document.getElementById('memberSelect').value;
         const activeSlots = [];
-        document.querySelectorAll('.availability-cell.active').forEach(c => {
-            activeSlots.push(getUTC(parseInt(c.dataset.index)));
-        });
-
+        document.querySelectorAll('.availability-cell.active').forEach(c => activeSlots.push(getUTC(parseInt(c.dataset.index))));
         let mIdx = binData.members.findIndex(m => m.name.toLowerCase() === name.toLowerCase());
-        if (mIdx > -1) {
-            binData.members[mIdx].availability = activeSlots;
-        } else {
-            binData.members.push({ name, availability: activeSlots });
-        }
-
+        if (mIdx > -1) binData.members[mIdx].availability = activeSlots;
+        else binData.members.push({ name, availability: activeSlots });
         socket.emit('save-availability', binData);
         alert("Availability Saved!");
         location.reload(); 
@@ -252,20 +376,16 @@
 
     document.getElementById('cancelBtn').onclick = () => location.reload();
     document.addEventListener('mouseup', () => isDragging = false);
+    document.addEventListener('touchend', () => isDragging = false);
 
-    /* --- Tooltip Popup --- */
     const popup = document.createElement('div');
-    popup.className = 'status-popup';
-    popup.style.display = 'none';
+    popup.className = 'status-popup'; popup.style.display = 'none';
     document.body.appendChild(popup);
 
     document.getElementById('availabilityGrid').addEventListener('mouseover', e => {
         if (isEditing || !e.target.classList.contains('availability-cell')) return;
         const idx = parseInt(e.target.dataset.index);
-        const present = binData.members.filter(m => 
-            m.availability.some(s => getLocalIndex(s.h, s.m, s.day) === idx)
-        ).map(m => m.name);
-        
+        const present = binData.members.filter(m => m.availability.some(s => getLocalIndex(s.h, s.m, s.day) === idx)).map(m => m.name);
         if (present.length > 0) {
             popup.innerText = present.join(', ');
             popup.style.display = 'block';
