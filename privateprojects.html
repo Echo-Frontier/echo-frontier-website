@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Admin: Progress | Echo Frontier</title>
+  <title>Admin: Projects | Echo Frontier</title>
   <link rel="stylesheet" href="styles.css">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
   <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -11,14 +11,43 @@
     if (!localStorage.getItem('frontier_token')) window.location.href = 'login.html';
   </script>
   <style>
-    /* Status Badge Colors */
-    .status-badge { padding: 4px 12px; border-radius: 20px; font-size: 0.7rem; font-weight: bold; text-transform: uppercase; }
-    .unstarted { background: #3d3d4d; color: #a0a0b0; }
-    .in-progress { background: rgba(106, 166, 255, 0.2); color: #6aa6ff; border: 1px solid #6aa6ff; }
-    .finished { background: rgba(106, 255, 154, 0.2); color: #6aff9a; border: 1px solid #6aff9a; }
+    /* Admin UI specific styles */
+    .mini-preview {
+      width: 60px;
+      height: 40px;
+      object-fit: cover;
+      border-radius: 4px;
+      border: 1px solid #3d3d4d;
+      margin-right: 5px;
+    }
+    .preview-strip {
+      margin-top: 10px;
+      display: flex;
+    }
+    .admin-wide-card {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      background: #151520;
+      padding: 20px;
+      border-radius: 12px;
+      margin-bottom: 15px;
+      border: 1px solid #2a2a3a;
+    }
+    .proj-info h3 { color: #6aa6ff; margin-bottom: 5px; }
+    .proj-info p { color: #8f98b3; font-size: 0.9rem; max-width: 400px; }
+    .proj-actions { display: flex; flex-direction: column; gap: 10px; }
     
-    .admin-wide-card { display: flex; justify-content: space-between; align-items: center; background: #151520; padding: 20px; border-radius: 12px; margin-bottom: 15px; border: 1px solid #2a2a3a; }
-    .task-meta { margin-top: 8px; }
+    .delete-btn {
+      background: transparent;
+      border: 1px solid #f7a6a6;
+      color: #f7a6a6;
+      padding: 8px;
+      border-radius: 6px;
+      cursor: pointer;
+      transition: 0.2s;
+    }
+    .delete-btn:hover { background: #f7a6a6; color: white; }
   </style>
 </head>
 <body>
@@ -26,51 +55,49 @@
 <header>
   <div class="header-title">
     <img src="icon.png" alt="Studio Icon">
-    <h1>Echo Frontier <span style="color: #6aa6ff; font-size: 0.8rem;">(Admin Progress)</span></h1>
+    <h1>Echo Frontier <span style="color: #6aa6ff; font-size: 0.8rem;">(Admin Projects)</span></h1>
   </div>
 </header>
 
 <nav>
   <a href="private.html">Home</a>
-  <a href="privateprojects.html">Projects</a>
+  <a href="privateprojects.html" class="active">Projects</a>
   <a href="privatemembers.html">Members</a>
-  <a href="privateprogress.html" class="active">Progress</a>
+  <a href="privateprogress.html">Progress</a>
   <a href="privateavailability.html">Availability</a>
   <a href="#" onclick="logout()" style="color: #f7a6a6;">Logout</a>
 </nav>
 
 <main>
   <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; padding: 0 10px;">
-    <h2>Development Roadmap</h2>
-    <button class="edit-btn" onclick="openAddModal()">+ Add New Task</button>
+    <h2>Project Management</h2>
+    <button class="edit-btn" onclick="openAddModal()">+ New Project</button>
   </div>
   
-  <div id="progress-list" class="admin-list-container">
+  <div id="projects-list" class="admin-list-container">
     </div>
 </main>
 
-<div id="task-modal" class="modal-overlay">
+<div id="project-modal" class="modal-overlay">
   <div class="modal-card" style="max-width: 500px;">
-    <h3 id="modal-title">Edit Task</h3>
-    <form id="task-form">
-      <input type="hidden" id="task-index">
+    <h3 id="modal-title">Edit Project</h3>
+    <form id="project-form">
+      <input type="hidden" id="proj-index">
       
-      <label>Task Title</label>
-      <input type="text" id="task-title" required placeholder="e.g., Server Infrastructure">
+      <label>Project Title</label>
+      <input type="text" id="proj-title" required placeholder="Project Name">
       
       <label>Description</label>
-      <textarea id="task-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;" placeholder="What needs to be done?"></textarea>
+      <textarea id="proj-desc" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; border-radius:8px; padding:10px; min-height:80px;" placeholder="What is this project about?"></textarea>
       
-      <label>Status</label>
-      <select id="task-status" style="width:100%; background:#0b0b10; border:1px solid #2a2a3a; color:white; padding:10px; border-radius:8px;">
-          <option value="Unstarted">Unstarted</option>
-          <option value="In Progress">In Progress</option>
-          <option value="Finished">Finished</option>
-      </select>
+      <label>Showcase Images (URLs)</label>
+      <input type="text" id="proj-img1" placeholder="Image 1 URL" style="margin-bottom:5px;">
+      <input type="text" id="proj-img2" placeholder="Image 2 URL" style="margin-bottom:5px;">
+      <input type="text" id="proj-img3" placeholder="Image 3 URL">
       
       <div class="modal-actions">
         <button type="button" onclick="closeModal()" class="cancel-btn">Cancel</button>
-        <button type="submit" class="save-btn">Save Task</button>
+        <button type="submit" class="save-btn">Save Project</button>
       </div>
     </form>
   </div>
@@ -78,101 +105,107 @@
 
 <script>
   const socket = io("https://website-backend-k7zl.onrender.com");
-  let allTasks = [];
+  let allProjects = [];
 
-  // 1. Initial Data Load from MongoDB
+  // 1. Initial Connection & Data Load
   socket.on('connect', () => {
-    console.log("Admin connected to MongoDB Sync");
-    socket.emit('get-progress');
+    console.log("Connected to MongoDB Project Sync");
+    socket.emit('get-projects');
   });
 
-  socket.on('load-progress', (data) => {
-    allTasks = data;
-    renderTasks();
+  socket.on('load-projects', (data) => {
+    allProjects = data;
+    renderProjects();
   });
 
-  function renderTasks() {
-    const container = document.getElementById('progress-list');
+  function renderProjects() {
+    const container = document.getElementById('projects-list');
     container.innerHTML = '';
 
-    if (allTasks.length === 0) {
-        container.innerHTML = `<p style="color:#555; text-align:center; padding:20px;">No tasks found in database.</p>`;
-        return;
+    if (allProjects.length === 0) {
+      container.innerHTML = `<p style="color:#555; text-align:center; padding:20px;">No projects found in database.</p>`;
+      return;
     }
 
-    allTasks.forEach((task, index) => {
+    allProjects.forEach((proj, index) => {
       const card = document.createElement('div');
       card.className = 'admin-wide-card';
       
-      const statusClass = task.status.toLowerCase().replace(" ", "-");
+      const images = proj.images || [];
+      const imgHTML = images.map(src => `<img src="${src}" class="mini-preview" onerror="this.src='https://placehold.co/60x40?text=Error'">`).join('');
 
       card.innerHTML = `
         <div class="proj-info">
-          <span class="status-badge ${statusClass}">${task.status}</span>
-          <h3 style="margin-top:10px;">${task.title}</h3>
-          <p style="color:#8f98b3; font-size:0.9rem;">${task.desc || 'No description provided.'}</p>
+          <h3>${proj.title}</h3>
+          <p>${proj.description || 'No description provided'}</p>
+          <div class="preview-strip">${imgHTML || '<span style="font-size:0.7rem; color:#555;">No images</span>'}</div>
         </div>
         <div class="proj-actions">
           <button class="edit-btn" onclick="openEditModal(${index})"><i class="fa-solid fa-pen"></i> Edit</button>
-          <button class="cancel-btn" onclick="deleteTask(${index})" style="margin-top:5px; background:transparent; border:none; color:#f7a6a6; cursor:pointer;"><i class="fa-solid fa-trash"></i></button>
+          <button class="delete-btn" onclick="deleteProject(${index})"><i class="fa-solid fa-trash"></i> Delete</button>
         </div>
       `;
       container.appendChild(card);
     });
   }
 
-  // 2. Modal Logic
+  // 2. Modal Controls
   function openEditModal(index) {
-    const t = allTasks[index];
-    document.getElementById('modal-title').innerText = "Edit Task";
-    document.getElementById('task-index').value = index;
-    document.getElementById('task-title').value = t.title;
-    document.getElementById('task-desc').value = t.desc || '';
-    document.getElementById('task-status').value = t.status;
-    document.getElementById('task-modal').style.display = 'flex';
+    const p = allProjects[index];
+    document.getElementById('modal-title').innerText = "Edit Project";
+    document.getElementById('proj-index').value = index;
+    document.getElementById('proj-title').value = p.title;
+    document.getElementById('proj-desc').value = p.description || '';
+    document.getElementById('proj-img1').value = p.images?.[0] || '';
+    document.getElementById('proj-img2').value = p.images?.[1] || '';
+    document.getElementById('proj-img3').value = p.images?.[2] || '';
+    document.getElementById('project-modal').style.display = 'flex';
   }
 
   function openAddModal() {
-    document.getElementById('modal-title').innerText = "New Task";
-    document.getElementById('task-index').value = "new";
-    document.getElementById('task-form').reset();
-    document.getElementById('task-modal').style.display = 'flex';
+    document.getElementById('modal-title').innerText = "New Project";
+    document.getElementById('proj-index').value = "new";
+    document.getElementById('project-form').reset();
+    document.getElementById('project-modal').style.display = 'flex';
   }
 
-  function closeModal() { document.getElementById('task-modal').style.display = 'none'; }
+  function closeModal() { document.getElementById('project-modal').style.display = 'none'; }
 
-  // 3. Save to MongoDB
-  document.getElementById('task-form').addEventListener('submit', (e) => {
+  // 3. Save / Update Logic
+  document.getElementById('project-form').addEventListener('submit', (e) => {
     e.preventDefault();
-    const idx = document.getElementById('task-index').value;
+    const idx = document.getElementById('proj-index').value;
     
-    const taskData = {
-      title: document.getElementById('task-title').value,
-      desc: document.getElementById('task-desc').value,
-      status: document.getElementById('task-status').value
+    const projectData = {
+      title: document.getElementById('proj-title').value,
+      description: document.getElementById('proj-desc').value,
+      images: [
+        document.getElementById('proj-img1').value,
+        document.getElementById('proj-img2').value,
+        document.getElementById('proj-img3').value
+      ].filter(path => path.trim() !== "") // Clean up empty URL inputs
     };
 
     if (idx === "new") {
-        allTasks.push(taskData);
+      allProjects.push(projectData);
     } else {
-        allTasks[parseInt(idx)] = taskData;
+      allProjects[parseInt(idx)] = projectData;
     }
 
-    // Emit to your new MongoDB server logic
-    socket.emit('update-progress-file', allTasks);
+    // Sync with MongoDB
+    socket.emit('update-projects-file', allProjects);
     closeModal();
   });
 
-  function deleteTask(index) {
-      if(confirm("Permanently delete this task?")) {
-          allTasks.splice(index, 1);
-          socket.emit('update-progress-file', allTasks);
-      }
+  // 4. Delete Logic
+  function deleteProject(index) {
+    if (confirm(`Are you sure you want to delete "${allProjects[index].title}"?`)) {
+      allProjects.splice(index, 1);
+      socket.emit('update-projects-file', allProjects);
+    }
   }
 
-  socket.on('save-success', () => {
-      console.log("Database Sync Complete");
-  });
+  socket.on('save-success', () => console.log("Project Sync Successful"));
 
   function logout() { localStorage.removeItem('frontier_token'); window.location.href = 'login.html'; }
 </script>
