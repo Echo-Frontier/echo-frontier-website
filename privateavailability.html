@@ -3,7 +3,7 @@
 <head>
     <meta charset="utf-8" />
     <title>Availability | Echo Frontier Admin</title>
-    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <meta name="viewport" content="width=device-width,initial-scale=1, maximum-scale=1, user-scalable=no" />
     <link rel="stylesheet" href="styles.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
@@ -15,11 +15,14 @@
         main { width: 100%; max-width: 1200px; margin: 0 auto; padding: 20px 15px; }
         h2 { font-size: 1.5rem; color: #fff; margin-bottom: 20px; }
 
-        /* ---------- Grid Wrapper & Zoom Logic ---------- */
+        /* ---------- Grid Container & Smart Zoom ---------- */
         .grid-container {
             position: relative;
             width: 100%;
-            overflow: hidden; /* Contains the zoomed element */
+            overflow: hidden; 
+            transition: height 0.3s ease;
+            background: #0f0f14;
+            border-radius: 12px;
         }
 
         .grid-wrapper {
@@ -31,34 +34,35 @@
             border-radius: 12px;
             border: 1px solid #2a2a3a;
             overflow-x: auto;
-            transition: transform 0.3s ease, transform-origin 0.3s ease;
+            transform-origin: top left;
+            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
         }
 
-        /* The "Zoom Out" Class for Mobile */
         .grid-wrapper.zoomed-out {
-            transform: scale(0.45); /* Adjust based on preference */
-            transform-origin: top left;
-            width: 220%; /* Compensate for scale to prevent huge gaps */
-            overflow-x: hidden;
+            overflow: hidden; /* Lock scroll when viewing full page */
         }
 
         .zoom-controls {
-            display: block;
-            margin-bottom: 10px;
-            text-align: right;
+            display: flex;
+            justify-content: flex-end;
+            margin-bottom: 12px;
         }
 
         .zoom-btn {
-            background: #2a2a3a;
+            background: rgba(106, 166, 255, 0.1);
             color: #6aa6ff;
             border: 1px solid #6aa6ff;
-            padding: 6px 12px;
+            padding: 8px 16px;
             border-radius: 6px;
-            font-size: 0.8rem;
+            font-size: 0.85rem;
+            font-weight: 600;
             cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        /* ---------- Grid Internals ---------- */
+        /* ---------- Grid Design ---------- */
         .days-header { display: grid; grid-template-columns: repeat(7, minmax(100px, 1fr)); margin-bottom: 10px; }
         .days-header div { text-align: center; color: #6aa6ff; font-weight: bold; font-size: 0.8rem; text-transform: uppercase; }
         
@@ -69,7 +73,7 @@
         .availability-cell { width: 100%; height: 20px; background: #1f1f2a; border-radius: 2px; border: 1px solid rgba(255,255,255,0.02); }
         .availability-cell.active { background: #6aa6ff !important; box-shadow: inset 0 0 8px rgba(0,0,0,0.3); }
 
-        /* ---------- Edit Controls ---------- */
+        /* ---------- Edit UI ---------- */
         .edit-controls { display: flex; flex-direction: column; gap: 12px; background: #1f1f2a; padding: 20px; border-radius: 12px; margin-bottom: 20px; border: 1px solid #2a2a3a; }
         .btn-group { display: flex; gap: 10px; width: 100%; }
         .edit-btn, .save-btn, .cancel-btn { width: 100%; padding: 14px; border-radius: 8px; font-weight: 700; border: none; cursor: pointer; }
@@ -78,10 +82,11 @@
         .cancel-btn { background: #2a2a3a; color: #fff; flex: 1; }
         select { background: #0b0b10; color: white; border: 1px solid #333345; padding: 12px; border-radius: 8px; width: 100%; }
 
-        /* ---------- PC DESIGN ---------- */
+        /* ---------- Desktop Media Query ---------- */
         @media (min-width: 1024px) {
-            .zoom-controls { display: none; } /* Hide zoom on PC */
-            .grid-wrapper { grid-template-columns: 80px 1fr; padding: 30px; overflow-x: hidden; }
+            .zoom-controls { display: none; }
+            .grid-wrapper { grid-template-columns: 80px 1fr; padding: 30px; overflow-x: hidden; transform: none !important; }
+            .grid-container { height: auto !important; }
             .days-header, .availability-grid { grid-template-columns: repeat(7, 1fr); }
             .edit-controls { flex-direction: row; align-items: center; padding: 15px 25px; }
             .btn-group { width: auto; }
@@ -126,7 +131,9 @@
     </div>
 
     <div class="zoom-controls">
-        <button class="zoom-btn" onclick="toggleZoom()"><i class="fas fa-search-minus"></i> Toggle Full View</button>
+        <button class="zoom-btn" onclick="toggleZoom()" id="zoomToggleButton">
+            <i class="fas fa-expand-alt"></i> <span>Full View</span>
+        </button>
     </div>
 
     <div class="grid-container" id="gridContainer">
@@ -146,20 +153,37 @@
     const ROWS = 48; 
     let isEditing = false, isDragging = false, dragState = null, binData = { members: [] };
 
-    function toggleZoom() {
+    /* --- Dynamic Zoom Feature --- */
+    function toggleZoom(forceReset = false) {
         const wrapper = document.getElementById('gridWrapper');
         const container = document.getElementById('gridContainer');
-        wrapper.classList.toggle('zoomed-out');
+        const btn = document.getElementById('zoomToggleButton');
+        const isZoomed = wrapper.classList.contains('zoomed-out');
         
-        // Adjust container height to prevent layout overlapping when scaled
-        if (wrapper.classList.contains('zoomed-out')) {
-            container.style.height = (wrapper.offsetHeight * 0.45) + "px";
-        } else {
+        if (isZoomed || forceReset) {
+            // Reset to normal
+            wrapper.style.transform = `scale(1)`;
+            wrapper.classList.remove('zoomed-out');
             container.style.height = "auto";
+            btn.querySelector('span').textContent = "Full View";
+            btn.querySelector('i').className = "fas fa-expand-alt";
+        } else {
+            // Fit to screen width and calculate scale
+            const containerWidth = container.offsetWidth;
+            const scrollWidth = wrapper.scrollWidth;
+            const scaleRatio = (containerWidth / scrollWidth) * 0.98;
+
+            wrapper.style.transform = `scale(${scaleRatio})`;
+            wrapper.classList.add('zoomed-out');
+            
+            // Adjust container height to match scaled content
+            container.style.height = (wrapper.offsetHeight * scaleRatio) + "px";
+            btn.querySelector('span').textContent = "Exit Full View";
+            btn.querySelector('i').className = "fas fa-compress-alt";
         }
     }
 
-    /* --- Logic remains exactly the same as previous version --- */
+    /* --- Auth & Initialization --- */
     function getLoggedInUser() {
         const token = localStorage.getItem('frontier_token');
         if (!token) return null;
@@ -173,15 +197,15 @@
 
     function buildGrid() {
         const dHeader = document.getElementById('daysHeader');
-        dHeader.innerHTML = '';
+        const tLabels = document.getElementById('timeLabels');
+        const grid = document.getElementById('availabilityGrid');
+        dHeader.innerHTML = ''; tLabels.innerHTML = ''; grid.innerHTML = '';
+
         days.forEach(d => {
             const div = document.createElement('div');
-            div.textContent = d;
-            dHeader.appendChild(div);
+            div.textContent = d; dHeader.appendChild(div);
         });
 
-        const tLabels = document.getElementById('timeLabels');
-        tLabels.innerHTML = '';
         for (let h = 0; h < 24; h++) {
             for (let i = 0; i < 2; i++) {
                 const div = document.createElement('div');
@@ -190,8 +214,6 @@
             }
         }
 
-        const grid = document.getElementById('availabilityGrid');
-        grid.innerHTML = '';
         for (let i = 0; i < ROWS * 7; i++) {
             const cell = document.createElement('div');
             cell.className = 'availability-cell';
@@ -208,30 +230,12 @@
             cell.addEventListener('touchstart', (e) => {
                 if(isEditing) { e.preventDefault(); handleInteract(); }
             }, {passive: false});
-
-            cell.addEventListener('mouseenter', () => {
-                if (isEditing && isDragging) cell.classList.toggle('active', dragState);
-            });
-            
+            cell.addEventListener('mouseenter', () => { if (isEditing && isDragging) cell.classList.toggle('active', dragState); });
             grid.appendChild(cell);
         }
     }
 
-    function getUTC(index) {
-        const row = Math.floor(index / 7), col = index % 7;
-        const h = Math.floor(row / 2), m = (row % 2) * 30;
-        const localDate = new Date(1970, 0, 4 + col, h, m, 0);
-        return { day: localDate.getUTCDay(), h: localDate.getUTCHours(), m: localDate.getUTCMinutes() };
-    }
-
-    function getLocalIndex(hUTC, mUTC, dUTC) {
-        const utcDate = new Date(Date.UTC(1970, 0, 4, hUTC, mUTC, 0));
-        const dayOffset = (dUTC - utcDate.getUTCDay() + 7) % 7;
-        utcDate.setUTCDate(utcDate.getUTCDate() + dayOffset);
-        const row = (utcDate.getHours() * 2) + (utcDate.getMinutes() >= 30 ? 1 : 0);
-        return (row * 7) + utcDate.getDay();
-    }
-
+    /* --- Data Sync --- */
     socket.on('connect', () => {
         socket.emit('get-members');
         socket.emit('get-availability');
@@ -245,9 +249,8 @@
         members.forEach(m => {
             const opt = document.createElement('option');
             opt.value = m.name; opt.textContent = m.name;
-            if (m.name.toLowerCase() === currentUser?.toLowerCase()) {
-                opt.selected = true; found = true;
-            } else { opt.disabled = true; }
+            if (m.name.toLowerCase() === currentUser?.toLowerCase()) { opt.selected = true; found = true; } 
+            else { opt.disabled = true; }
             select.appendChild(opt);
         });
         if (!found && currentUser) {
@@ -257,17 +260,13 @@
         }
     });
 
-    socket.on('load-availability', data => { 
-        binData = data || { members: [] }; 
-        applyHeatmap(); 
-    });
+    socket.on('load-availability', data => { binData = data || { members: [] }; applyHeatmap(); });
 
     function applyHeatmap() {
         if (isEditing) return;
         const cells = document.querySelectorAll('.availability-cell');
         cells.forEach(c => { c.style.background = '#1f1f2a'; c.classList.remove('active'); });
-
-        if (!binData.members || !binData.members.length) return;
+        if (!binData.members) return;
         const counts = {}; let max = 0;
         binData.members.forEach(m => {
             m.availability.forEach(slot => {
@@ -284,16 +283,43 @@
         });
     }
 
+    function getUTC(index) {
+        const row = Math.floor(index / 7), col = index % 7;
+        const h = Math.floor(row / 2), m = (row % 2) * 30;
+        const localDate = new Date(1970, 0, 4 + col, h, m, 0);
+        return { day: localDate.getUTCDay(), h: localDate.getUTCHours(), m: localDate.getUTCMinutes() };
+    }
+
+    function getLocalIndex(hUTC, mUTC, dUTC) {
+        const utcDate = new Date(Date.UTC(1970, 0, 4, hUTC, mUTC, 0));
+        const dayOffset = (dUTC - utcDate.getUTCDay() + 7) % 7;
+        utcDate.setUTCDate(utcDate.getUTCDate() + dayOffset);
+        return (Math.floor((utcDate.getHours() * 2) + (utcDate.getMinutes() >= 30 ? 1 : 0)) * 7) + utcDate.getDay();
+    }
+
+    /* --- Event Listeners --- */
     document.getElementById('editBtn').onclick = () => {
         const select = document.getElementById('memberSelect');
         const currentUser = getLoggedInUser();
         if (!currentUser || select.value.toLowerCase() !== currentUser.toLowerCase()) return alert("Access Denied.");
+        
+        // AUTO RESET ZOOM ON EDIT
+        toggleZoom(true); 
+
         isEditing = true;
         document.getElementById('editControls').style.display = 'flex';
         document.getElementById('editBtn').style.display = 'none';
-        select.style.pointerEvents = 'none';
         document.querySelectorAll('.availability-cell').forEach(c => { c.classList.add('editable'); c.style.background = ''; });
         select.dispatchEvent(new Event('change'));
+    };
+
+    document.getElementById('memberSelect').onchange = (e) => {
+        document.querySelectorAll('.availability-cell').forEach(c => c.classList.remove('active'));
+        const member = binData.members.find(m => m.name.toLowerCase() === e.target.value.toLowerCase());
+        if (member) member.availability.forEach(slot => {
+            const cell = document.querySelector(`[data-index="${getLocalIndex(slot.h, slot.m, slot.day)}"]`);
+            if (cell) cell.classList.add('active');
+        });
     };
 
     document.getElementById('saveBtn').onclick = () => {
