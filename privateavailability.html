@@ -20,9 +20,9 @@
             position: relative;
             width: 100%;
             overflow: hidden; 
-            transition: height 0.3s ease;
             background: #0f0f14;
             border-radius: 12px;
+            transition: height 0.3s ease;
         }
 
         .grid-wrapper {
@@ -34,12 +34,14 @@
             border-radius: 12px;
             border: 1px solid #2a2a3a;
             overflow-x: auto;
-            transform-origin: top left;
-            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1);
+            transform-origin: top left; /* Critical for alignment */
+            transition: transform 0.4s cubic-bezier(0.165, 0.84, 0.44, 1), width 0.4s ease;
+            width: 100%; /* Default */
         }
 
+        /* Lock scroll when zoomed out */
         .grid-wrapper.zoomed-out {
-            overflow: hidden; /* Lock scroll when viewing full page */
+            overflow: hidden; 
         }
 
         .zoom-controls {
@@ -85,7 +87,7 @@
         /* ---------- Desktop Media Query ---------- */
         @media (min-width: 1024px) {
             .zoom-controls { display: none; }
-            .grid-wrapper { grid-template-columns: 80px 1fr; padding: 30px; overflow-x: hidden; transform: none !important; }
+            .grid-wrapper { grid-template-columns: 80px 1fr; padding: 30px; overflow-x: hidden; transform: none !important; width: 100% !important; }
             .grid-container { height: auto !important; }
             .days-header, .availability-grid { grid-template-columns: repeat(7, 1fr); }
             .edit-controls { flex-direction: row; align-items: center; padding: 15px 25px; }
@@ -153,7 +155,7 @@
     const ROWS = 48; 
     let isEditing = false, isDragging = false, dragState = null, binData = { members: [] };
 
-    /* --- Dynamic Zoom Feature --- */
+    /* --- Fixed Dynamic Zoom Feature --- */
     function toggleZoom(forceReset = false) {
         const wrapper = document.getElementById('gridWrapper');
         const container = document.getElementById('gridContainer');
@@ -163,21 +165,29 @@
         if (isZoomed || forceReset) {
             // Reset to normal
             wrapper.style.transform = `scale(1)`;
+            wrapper.style.width = "100%";
             wrapper.classList.remove('zoomed-out');
             container.style.height = "auto";
             btn.querySelector('span').textContent = "Full View";
             btn.querySelector('i').className = "fas fa-expand-alt";
         } else {
-            // Fit to screen width and calculate scale
+            // 1. Get widths
             const containerWidth = container.offsetWidth;
             const scrollWidth = wrapper.scrollWidth;
-            const scaleRatio = (containerWidth / scrollWidth) * 0.98;
+            
+            // 2. Calculate Scale Ratio
+            const scaleRatio = (containerWidth / scrollWidth);
 
+            // 3. APPLY FIX: Expand the base width so that after scaling down, it equals the container width
+            // Formula: BaseWidth = 100% / scaleRatio
+            wrapper.style.width = (100 / scaleRatio) + "%";
             wrapper.style.transform = `scale(${scaleRatio})`;
+            
             wrapper.classList.add('zoomed-out');
             
-            // Adjust container height to match scaled content
+            // 4. Adjust container height to match scaled visual height
             container.style.height = (wrapper.offsetHeight * scaleRatio) + "px";
+            
             btn.querySelector('span').textContent = "Exit Full View";
             btn.querySelector('i').className = "fas fa-compress-alt";
         }
@@ -235,7 +245,6 @@
         }
     }
 
-    /* --- Data Sync --- */
     socket.on('connect', () => {
         socket.emit('get-members');
         socket.emit('get-availability');
@@ -297,29 +306,16 @@
         return (Math.floor((utcDate.getHours() * 2) + (utcDate.getMinutes() >= 30 ? 1 : 0)) * 7) + utcDate.getDay();
     }
 
-    /* --- Event Listeners --- */
     document.getElementById('editBtn').onclick = () => {
         const select = document.getElementById('memberSelect');
         const currentUser = getLoggedInUser();
         if (!currentUser || select.value.toLowerCase() !== currentUser.toLowerCase()) return alert("Access Denied.");
-        
-        // AUTO RESET ZOOM ON EDIT
         toggleZoom(true); 
-
         isEditing = true;
         document.getElementById('editControls').style.display = 'flex';
         document.getElementById('editBtn').style.display = 'none';
         document.querySelectorAll('.availability-cell').forEach(c => { c.classList.add('editable'); c.style.background = ''; });
         select.dispatchEvent(new Event('change'));
-    };
-
-    document.getElementById('memberSelect').onchange = (e) => {
-        document.querySelectorAll('.availability-cell').forEach(c => c.classList.remove('active'));
-        const member = binData.members.find(m => m.name.toLowerCase() === e.target.value.toLowerCase());
-        if (member) member.availability.forEach(slot => {
-            const cell = document.querySelector(`[data-index="${getLocalIndex(slot.h, slot.m, slot.day)}"]`);
-            if (cell) cell.classList.add('active');
-        });
     };
 
     document.getElementById('saveBtn').onclick = () => {
